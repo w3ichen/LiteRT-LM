@@ -53,15 +53,9 @@ ModelAssetBundleResources::Create(
       mapped_model_asset_bundle_file->length());
 
   ASSIGN_OR_RETURN(auto files, ExtractFilesfromZipFile(data));
-  absl::flat_hash_map<std::string, absl::string_view> files_as_string_views;
-  for (const auto& [name, offset_and_size] : files) {
-    files_as_string_views[name] =
-        data.substr(offset_and_size.offset, offset_and_size.size);
-  }
 
   return absl::WrapUnique(new ModelAssetBundleResources(
-      tag, std::move(mapped_model_asset_bundle_file),
-      std::move(files_as_string_views)));
+      tag, std::move(mapped_model_asset_bundle_file), std::move(files)));
 }
 
 // static
@@ -75,7 +69,7 @@ ModelAssetBundleResources::Create(const std::string& tag,
 ModelAssetBundleResources::ModelAssetBundleResources(
     std::string tag,
     std::unique_ptr<MemoryMappedFile> mapped_model_asset_bundle_file,
-    absl::flat_hash_map<std::string, absl::string_view> files)
+    absl::flat_hash_map<std::string, OffsetAndSize> files)
     : tag_(std::move(tag)),
       mapped_model_asset_bundle_file_(
           std::move(mapped_model_asset_bundle_file)),
@@ -85,7 +79,10 @@ absl::StatusOr<absl::string_view> ModelAssetBundleResources::GetFile(
     absl::string_view filename) const {
   auto it = files_.find(filename);
   if (it != files_.end()) {
-    return it->second;
+    return absl::string_view(
+        reinterpret_cast<const char*>(mapped_model_asset_bundle_file_->data()) +
+            it->second.offset,
+        it->second.size);
   }
   return absl::NotFoundError(
       absl::StrCat("No file with name: ", filename,

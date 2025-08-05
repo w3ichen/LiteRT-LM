@@ -97,11 +97,10 @@ absl::StatusOr<ZipFileInfo> GetCurrentZipFileInfo(const unzFile& zf) {
   // Close file and return.
   RETURN_IF_ERROR(UnzipErrorToStatus(unzCloseCurrentFile(zf)));
 
-  ZipFileInfo result{};
-  result.name = file_name;
-  result.position = position;
-  result.size = file_info.uncompressed_size;
-  return result;
+  return ZipFileInfo{
+      .name = std::move(file_name),
+      .position = position,
+      .size = file_info.uncompressed_size};
 }
 
 }  // namespace

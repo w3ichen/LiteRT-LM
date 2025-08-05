@@ -25,6 +25,7 @@ limitations under the License.
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "runtime/util/memory_mapped_file.h"
 #include "runtime/util/scoped_file.h"
+#include "runtime/util/zip_utils.h"
 
 namespace litert::lm {
 
@@ -46,8 +47,7 @@ class ModelAssetBundleResources {
 
   // Convenience method to create from a ScopedFile directly.
   static absl::StatusOr<std::unique_ptr<ModelAssetBundleResources>> Create(
-      const std::string& tag,
-      ScopedFile&& model_asset_bundle_file);
+      const std::string& tag, ScopedFile&& model_asset_bundle_file);
 
   // ModelResources is neither copyable nor movable.
   ModelAssetBundleResources(const ModelAssetBundleResources&) = delete;
@@ -73,7 +73,7 @@ class ModelAssetBundleResources {
   ModelAssetBundleResources(
       std::string tag,
       std::unique_ptr<MemoryMappedFile> mapped_model_asset_bundle_file,
-      absl::flat_hash_map<std::string, absl::string_view> files);
+      absl::flat_hash_map<std::string, OffsetAndSize> files);
 
   // The model asset bundle resources tag.
   const std::string tag_;
@@ -85,7 +85,7 @@ class ModelAssetBundleResources {
   // (corresponding to a basename, e.g. "hand_detector.tflite") as key and
   // a pointer to the file contents as value. Each file can be either a TFLite
   // model file, resource file or a model bundle file for sub-task.
-  const absl::flat_hash_map<std::string, absl::string_view> files_;
+  const absl::flat_hash_map<std::string, OffsetAndSize> files_;
 };
 
 }  // namespace litert::lm
