@@ -118,6 +118,18 @@ absl::Status StopTokenDetector::ProcessTokens(
   return absl::OkStatus();
 }
 
+bool StopTokenDetector::IsPartialStopTokenFound(int index) const {
+  if (stop_token_found_[index]) {
+    return false;
+  }
+  for (int j = 0; j < batch_item_match_progress_[index].size(); ++j) {
+    if (batch_item_match_progress_[index][j] > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const std::vector<int>& StopTokenDetector::GetStepsBeforeStopTokens() const {
   return matched_stop_sequence_length_;
 }

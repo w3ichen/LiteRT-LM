@@ -33,7 +33,7 @@
 namespace litert::lm {
 
 // Runs the pipeline to prefill the input prompt.
-// - executor: The initialized LLM Executor to call.
+// - executor: The executor that call the core LLM model.
 // - tokenizer: The tokenizer to encode the text into token ids.
 // - prompt: The input prompt to prefill.
 // - bos_token_id: The token id of the start token.
@@ -47,12 +47,10 @@ absl::StatusOr<int> Prefill(LlmExecutor& executor, Tokenizer& tokenizer,
                             std::optional<BenchmarkInfo>& benchmark_info);
 
 // Runs the pipeline to decode the input prompt.
-// - executor: The initialized LLM Executor to call.
+// - executor: The executor that call the core LLM model.
 // - tokenizer: The tokenizer to decode the token ids into text.
 // - stop_token_ids: The token ids to stop the decoding process.
 // - benchmark_info: The benchmark info to record the performance metrics.
-// TODO(b/397975034): support batched output and update the logic to avoid
-// detokenizing the stop tokens.
 absl::StatusOr<Responses> Decode(LlmExecutor& executor, Tokenizer& tokenizer,
                                  const StopTokenDetector& stop_token_detector,
                                  std::optional<BenchmarkInfo>& benchmark_info);
@@ -67,12 +65,13 @@ absl::Status DecodeStreaming(LlmExecutor& executor, Tokenizer& tokenizer,
                              InferenceObservable* observer);
 
 // Runs the pipeline to decode the input prompt.
-// - executor: The initialized LLM Executor to call.
+// - executor: The executor that call the core LLM model.
 // - tokenizer: The tokenizer to decode the token ids into text.
 // - stop_token_ids: The token ids to stop the decoding process.
 // - num_output_candidates: The number of output candidates to generate.
 // - sampler: The sampler to sample the token ids from the logits.
 // - decoded_ids: The decoded token ids from the external sampling process.
+//   The supported shape is [num_output_candidates, 1].
 // - benchmark_info: The benchmark info to record the performance metrics.
 absl::StatusOr<Responses> DecodeCustomSampling(
     LlmExecutor& executor, Tokenizer& tokenizer,

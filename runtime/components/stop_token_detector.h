@@ -69,6 +69,13 @@ class StopTokenDetector {
     return stop_token_found_;
   }
 
+  // Checks if a partial stop token sequence has been found for the given batch
+  // index.
+  //   - index: The index of the batch item to check.
+  // Returns True if a partial stop token sequence has been found for the given
+  // batch index.
+  bool IsPartialStopTokenFound(int index) const;
+
  private:
   // Stores all added stop sequences.
   std::vector<std::vector<int>> stop_sequences_storage_;

@@ -117,6 +117,18 @@ TEST_F(PipelineTest, Decode) {
   EXPECT_EQ(*(responses->GetResponseTextAt(0)), " How's it going?");
 }
 
+TEST_F(PipelineTest, DecodeWithTwoStopTokens) {
+  std::optional<BenchmarkInfo> benchmark_info;
+  StopTokenDetector stop_token_detector(1);
+  EXPECT_OK(stop_token_detector.AddStopTokenSequence({2295, 2294}));
+  auto responses =
+      Decode(*executor_, *tokenizer_, stop_token_detector, benchmark_info);
+  EXPECT_OK(responses);
+  // The response is " How's it going" since "?!" is the stop token which is
+  // not included in the response.
+  EXPECT_EQ(*(responses->GetResponseTextAt(0)), " How's it going");
+}
+
 TEST_F(PipelineTest, DecodeReachMaxNumTokens) {
   // Set the max number of tokens to 3.
   executor_->GetMutableExecutorSettings().value()->SetMaxNumTokens(3);
@@ -303,13 +315,15 @@ TEST_F(PipelineCustomSamplingTest, DecodeCustomSamplingStreaming) {
 
   StopTokenDetector stop_token_detector(2);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({0}));
+  EXPECT_OK(stop_token_detector.AddStopTokenSequence({2295, 2294}));
   EXPECT_OK(DecodeCustomSamplingStreaming(
       *executor_, *tokenizer_, stop_token_detector,
       /*num_output_candidates=*/2, *sampler, *decoded_ids, benchmark_info,
       &observer));
-  // First candidate: " How's it going?!".
-  EXPECT_EQ(observer.GetResponses()[0], " How's it going?!");
-  // Second candidate: " Hello World!".
+  // First candidate: " How's it going" - ("?!") are stop tokens that is not
+  // included in the output.
+  EXPECT_EQ(observer.GetResponses()[0], " How's it going");
+  // Second candidate: " Hello World!"
   EXPECT_EQ(observer.GetResponses()[1], " Hello World!");
 }
 
