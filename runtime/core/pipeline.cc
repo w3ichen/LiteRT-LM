@@ -271,6 +271,7 @@ absl::StatusOr<Responses> DecodeLoop(
   DecodeOneStep run_one_step(&executor, &tokenizer, num_output_candidates,
                              stop_token_detector, benchmark_info, sampler);
 
+  std::vector<std::string> pending_stop_tokens(num_output_candidates);
   while (true) {
     absl::StatusOr<DecodeResult> decode_result = run_one_step.Run(decoded_ids);
     if (!decode_result.ok()) {
@@ -286,28 +287,35 @@ absl::StatusOr<Responses> DecodeLoop(
     Responses step_responses(num_output_candidates);
     bool any_updates = false;
     for (int j = 0; j < num_output_candidates; ++j) {
-      if (!run_one_step.GetStopTokensFound()[j]
-          // TODO(b/435237917): This can handle the case where a partial stop
-          // would eventually become a full stop token but will miss the
-          // pending token if there is not a full stop token found later.
-          // Figure out a better way to handle this.
-          && !run_one_step.IsPartialStopTokenFound(j)) {
-        any_updates = true;
-        std::string result_text =
-            absl::StrReplaceAll(run_one_step.GetResultText()[j], {{"▁", " "}});
-        if (is_streaming) {
-          step_responses.GetMutableResponseTexts()[j] = result_text;
-          if (is_custom_sampling) {
-            step_responses.GetMutableScores()[j] = run_one_step.GetScores()[j];
-          }
-        } else {
-          final_responses.GetMutableResponseTexts()[j] += result_text;
-          if (is_custom_sampling) {
-            accumulated_scores[j] += run_one_step.GetScores()[j];
-            num_decoded_tokens[j]++;
-          }
+      if (run_one_step.GetStopTokensFound()[j]) {
+        continue;
+      }
+
+      if (run_one_step.IsPartialStopTokenFound(j)) {
+        pending_stop_tokens[j] += run_one_step.GetResultText()[j];
+        continue;
+      }
+
+      any_updates = true;
+      // The tokenizer may return a token with a special character " " that
+      // should be replaced with a space.
+      std::string result_text = absl::StrReplaceAll(
+          (pending_stop_tokens[j] + run_one_step.GetResultText()[j]),
+          {{"▁", " "}});
+      if (is_streaming) {
+        step_responses.GetMutableResponseTexts()[j] = result_text;
+        if (is_custom_sampling) {
+          step_responses.GetMutableScores()[j] = run_one_step.GetScores()[j];
+        }
+      } else {
+        final_responses.GetMutableResponseTexts()[j] += result_text;
+        if (is_custom_sampling) {
+          accumulated_scores[j] += run_one_step.GetScores()[j];
+          num_decoded_tokens[j]++;
         }
       }
+      // Clear the pending stop tokens for the next step.
+      pending_stop_tokens[j].clear();
     }
 
     if (is_streaming && any_updates && *decode_result == kContinue) {

@@ -1,6 +1,7 @@
 #include "runtime/core/pipeline.h"
 
 #include <filesystem>  // NOLINT: Required for path manipulation.
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -218,7 +219,7 @@ class PipelineCustomSamplingTest : public testing::Test {
     std::vector<std::vector<int>> prefill_tokens = {
         {2, 90, 547, 58, 735, 210, 466, 2294}};
     // The decode tokens are the expected tokens that will be returned by the
-    // Decode function. The  two values are the token ids of the output
+    // Decode function. The two values are the token ids of the output
     // responses " How's it going?!" and " Hello World!" followed by the stop
     // token id (0).
     std::vector<std::vector<int>> decode_tokens = {
@@ -350,6 +351,70 @@ TEST_F(PipelineCustomSamplingTest,
   EXPECT_EQ(observer.GetResponses()[0], " How's");
   // Second candidate truncated at max number of tokens: " Hello".
   EXPECT_EQ(observer.GetResponses()[1], " Hello");
+}
+
+class PipelineComplexStopTokenDetectorTest : public testing::Test {
+ protected:
+  void SetUp() override {
+    auto tokenizer = SentencePieceTokenizer::CreateFromFile(
+        (std::filesystem::path(::testing::SrcDir()) / kTestdataDir /
+         "sentencepiece.model")
+            .string());
+    ASSERT_OK(tokenizer);
+    tokenizer_ = std::move(*tokenizer);
+
+    // The Prefill doesn't matter for this test.
+    std::vector<std::vector<int>> prefill_tokens = {
+        {2, 90, 547, 58, 735, 210, 466, 2294}};
+    // The decode tokens are the expected tokens that will be returned by the
+    // Decode function. The two values are the token ids of the output
+    // responses " How's it going?!" and " Hello World!" followed by the stop
+    // token id (0).
+    std::vector<std::vector<int>> decode_tokens = {
+        {224, 90}, {24, 547},    {8, 58},   {66, 735}, {246, 210},
+        {18, 466}, {2295, 2294}, {2294, 0}, {0, 0}};
+    // Vocab size needs to at least be larger than the largest token id 2294.
+    executor_ = std::make_unique<FakeLlmExecutor>(
+        /*vocab_size=*/2560, prefill_tokens, decode_tokens, /*batch_size=*/2);
+  }
+
+  std::unique_ptr<Tokenizer> tokenizer_;
+  std::unique_ptr<FakeLlmExecutor> executor_;
+};
+
+TEST_F(PipelineComplexStopTokenDetectorTest, DecodeComplexStopTokenDetector) {
+  auto sampler_or = TopPSampler::Create(/*k=*/1, /*p=*/0.5, /*temperature=*/1.0,
+                                        /*batch_size=*/2, /*seed=*/1);
+  EXPECT_TRUE(sampler_or.ok());
+  std::unique_ptr<TopPSampler> sampler = std::move(sampler_or.value());
+
+  auto decoded_ids = CreateTensorBuffer<int>({2, 1});
+  std::optional<BenchmarkInfo> benchmark_info;
+  StopTokenDetector stop_token_detector(2);
+  // This is only a partial stop token sequence matched for the first batch.
+  EXPECT_OK(stop_token_detector.AddStopTokenSequence({224, 24, 8, 9}));
+  // This is a full stop token sequence matched for the first batch
+  EXPECT_OK(stop_token_detector.AddStopTokenSequence({0}));
+  // This will be a full match for the second batch.
+  EXPECT_OK(stop_token_detector.AddStopTokenSequence({90, 547, 58}));
+
+  auto responses = DecodeCustomSampling(
+      *executor_, *tokenizer_, stop_token_detector,
+      /*num_output_candidates=*/2, *sampler, *decoded_ids, benchmark_info);
+  EXPECT_OK(responses);
+  EXPECT_EQ(responses->GetNumOutputCandidates(), 2);
+  // First candidate: " How's it going?!".
+  EXPECT_EQ(*(responses->GetResponseTextAt(0)), " How's it going?!");
+  // Second candidate: "" since the stop token sequence is matched at
+  // the beginning of the second batch.
+  EXPECT_EQ(*(responses->GetResponseTextAt(1)), "");
+
+  // The scores are equal to 0.0f (log(1.0f)).
+  EXPECT_EQ(*(responses->GetScoreAt(0)), 0.0f);
+  // The second candidate doesn't have any tokens decoded so the score is set to
+  // -inf.
+  EXPECT_EQ(*(responses->GetScoreAt(1)),
+            -std::numeric_limits<float>::infinity());
 }
 
 }  // namespace
