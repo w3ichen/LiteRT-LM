@@ -362,7 +362,7 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
-        "@litert//litert/c:litert_dispatch_headers",
+        "@litert//litert/c:litert_tensor_buffer",
         "@litert//litert/cc:litert_element_type",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_model",
