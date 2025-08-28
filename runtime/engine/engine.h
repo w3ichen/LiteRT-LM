@@ -75,6 +75,13 @@ class Engine {
     // (https://ai.google.dev/gemini-api/docs/text-generation).
     virtual absl::StatusOr<Responses> GenerateContent(
         const std::vector<InputData>& contents) = 0;
+
+    // This is a not blocking call and the function will return right away. The
+    // result will be streamed through the observer.
+    //
+    // The observer will only receive callbacks if the function returns an OK
+    // status. If the function returns an error status, the observer will not
+    // receive any callbacks.
     virtual absl::Status GenerateContentStream(
         const std::vector<InputData>& contents,
         InferenceObservable* observer) = 0;

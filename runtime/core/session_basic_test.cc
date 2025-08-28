@@ -17,11 +17,14 @@
 #include <filesystem>  // NOLINT: Required for path manipulation.
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "absl/status/status.h"  // from @com_google_absl
+#include "absl/synchronization/notification.h"  // from @com_google_absl
 #include "absl/time/time.h"  // from @com_google_absl
 #include "runtime/components/sentencepiece_tokenizer.h"
 #include "runtime/components/tokenizer.h"
@@ -135,8 +138,7 @@ TEST_F(SessionBasicTest, RunPrefillAsync) {
   std::vector<InputData> inputs;
   inputs.emplace_back(InputText("Hello World!"));
   TestObserver observer;
-  EXPECT_OK(
-      (*session)->RunPrefillAsync(inputs, &observer));
+  EXPECT_OK((*session)->RunPrefillAsync(inputs, &observer));
   // Wait for the async call to finish.
   EXPECT_OK(worker_thread_pool_->WaitUntilDone(absl::Seconds(100)));
   EXPECT_TRUE(observer.IsDone());
@@ -155,11 +157,126 @@ TEST_F(SessionBasicTest, RunDecodeAsync) {
   std::vector<InputData> inputs;
   inputs.emplace_back(InputText("Hello World!"));
   TestObserver observer;
-  EXPECT_OK(
-      (*session)->RunPrefillAsync(inputs, &observer));
+  EXPECT_OK((*session)->RunPrefillAsync(inputs, &observer));
   EXPECT_OK((*session)->RunDecodeAsync(&observer));
   EXPECT_OK(worker_thread_pool_->WaitUntilDone(absl::Seconds(100)));
   EXPECT_TRUE(observer.IsDone());
+}
+
+class StreamingTestObserver : public InferenceObservable {
+ public:
+  void OnNext(const Responses& responses) override {
+    ASSERT_EQ(responses.GetNumOutputCandidates(), 1);
+    texts_.push_back(std::string(*responses.GetResponseTextAt(0)));
+  }
+
+  void OnError(const absl::Status& status) override {
+    status_ = status;
+    done_.Notify();
+  }
+
+  void OnDone() override { done_.Notify(); }
+
+  absl::Status WaitUntilDone() {
+    done_.WaitForNotificationWithTimeout(absl::Seconds(10));
+    return status_;
+  }
+
+  std::vector<std::string> GetTexts() { return texts_; }
+
+ private:
+  absl::Notification done_;
+  absl::Status status_;
+  std::vector<std::string> texts_;
+};
+
+TEST_F(SessionBasicTest, GenerateContentStream) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  auto session =
+      SessionBasic::Create(executor_.get(), tokenizer_.get(), session_config,
+                           std::nullopt, worker_thread_pool_.get());
+
+  std::vector<InputData> inputs;
+  inputs.emplace_back(InputText("Hello World!"));
+  StreamingTestObserver observer;
+  EXPECT_OK((*session)->GenerateContentStream(inputs, &observer));
+
+  EXPECT_OK(observer.WaitUntilDone());
+  EXPECT_THAT(observer.GetTexts(),
+              testing::ElementsAre(" How", "'", "s", " it", " go", "ing", "?"));
+}
+
+TEST_F(SessionBasicTest, GenerateContentStreamEmptyInput) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  auto session =
+      SessionBasic::Create(executor_.get(), tokenizer_.get(), session_config,
+                           std::nullopt, worker_thread_pool_.get());
+
+  std::vector<InputData> inputs;
+  StreamingTestObserver observer;
+  EXPECT_THAT((*session)->GenerateContentStream(inputs, &observer),
+              testing::status::StatusIs(absl::StatusCode::kInvalidArgument,
+                                        "Input is empty."));
+}
+
+TEST_F(SessionBasicTest, GenerateContentStreamPrefillError) {
+  // Configure the executor to fail at prefill.
+  auto* fake_executor = static_cast<FakeLlmExecutor*>(executor_.get());
+  fake_executor->SetPrefillStatus(absl::InternalError("Prefill failed"));
+
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  auto session =
+      SessionBasic::Create(executor_.get(), tokenizer_.get(), session_config,
+                           std::nullopt, worker_thread_pool_.get());
+
+  std::vector<InputData> inputs;
+  inputs.emplace_back(InputText("Hello World!"));
+  StreamingTestObserver observer;
+  EXPECT_OK((*session)->GenerateContentStream(inputs, &observer));
+
+  absl::Status status = observer.WaitUntilDone();
+  EXPECT_THAT(status, testing::status::StatusIs(absl::StatusCode::kInternal,
+                                                "Prefill failed"));
+}
+
+TEST_F(SessionBasicTest, GenerateContentStreamDecodeError) {
+  // Configure the executor to fail at decode.
+  auto* fake_executor = static_cast<FakeLlmExecutor*>(executor_.get());
+  fake_executor->SetDecodeStatus(absl::InternalError("Decode failed"));
+
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  auto session =
+      SessionBasic::Create(executor_.get(), tokenizer_.get(), session_config,
+                           std::nullopt, worker_thread_pool_.get());
+
+  std::vector<InputData> inputs;
+  inputs.emplace_back(InputText("Hello World!"));
+  StreamingTestObserver observer;
+  EXPECT_OK((*session)->GenerateContentStream(inputs, &observer));
+
+  absl::Status status = observer.WaitUntilDone();
+  EXPECT_THAT(status, testing::status::StatusIs(absl::StatusCode::kInternal,
+                                                "Decode failed"));
 }
 
 }  // namespace

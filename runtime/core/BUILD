@@ -169,6 +169,8 @@ cc_test(
     deps = [
         ":session_basic",
         "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
         "//runtime/components:sentencepiece_tokenizer",
         "//runtime/components:tokenizer",

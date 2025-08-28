@@ -269,8 +269,42 @@ absl::StatusOr<Responses> SessionBasic::GenerateContent(
 
 absl::Status SessionBasic::GenerateContentStream(
     const std::vector<InputData>& contents, InferenceObservable* observer) {
-  RETURN_IF_ERROR(RunPrefillAsync(contents, observer));
-  return RunDecodeAsync(observer);
+  // An observer to handle the result of the async prefill operation.
+  // It triggers the decode step if prefill is successful, or propagates the
+  // error.
+  class PrefillObserver : public InferenceObservable {
+   public:
+    PrefillObserver(SessionBasic* session, InferenceObservable* decode_observer)
+        : session_(session), decode_observer_(decode_observer) {}
+
+    void OnNext(const Responses& responses) override {
+      ABSL_LOG(WARNING) << "OnNext should not be called during prefill!";
+    }
+
+    void OnError(const absl::Status& status) override {
+      decode_observer_->OnError(status);
+      delete this;
+    }
+
+    void OnDone() override {
+      absl::Status status = session_->RunDecodeAsync(decode_observer_);
+      if (!status.ok()) {
+        decode_observer_->OnError(status);
+      }
+      delete this;
+    }
+
+   private:
+    SessionBasic* session_;
+    InferenceObservable* decode_observer_;
+  };
+
+  auto* prefill_observer = new PrefillObserver(this, observer);
+  auto status = RunPrefillAsync(contents, prefill_observer);
+  if (!status.ok()) {
+    delete prefill_observer;
+  }
+  return status;
 }
 
 absl::StatusOr<BenchmarkInfo> SessionBasic::GetBenchmarkInfo() {

@@ -91,6 +91,7 @@ FakeLlmExecutor::FakeLlmExecutor(
 }
 
 absl::Status FakeLlmExecutor::Prefill(const ExecutorInputs& inputs) {
+  RETURN_IF_ERROR(prefill_status_);
   if (prefill_times_ >= prefill_tokens_set_.size()) {
     return absl::InvalidArgumentError(absl::StrCat(
         "Prefill function has been called more times than the number of "
@@ -108,6 +109,7 @@ absl::Status FakeLlmExecutor::Prefill(const ExecutorInputs& inputs) {
 
 absl::Status FakeLlmExecutor::Prefill(
     const ExecutorInputs& inputs, const ExecutorPrefillParams& prefill_params) {
+  RETURN_IF_ERROR(prefill_status_);
   if (prefill_params.GetWaitForCompletion()) {
     // Sleep some time here to simulate a synchronous prefill.
     // We can time the function time in test to make sure the code calls prefill
@@ -118,6 +120,7 @@ absl::Status FakeLlmExecutor::Prefill(
 }
 
 absl::Status FakeLlmExecutor::Decode(::litert::TensorBuffer& output_tokens) {
+  RETURN_IF_ERROR(decode_status_);
   if (decode_times_ >= decode_tokens_set_.size()) {
     return absl::InvalidArgumentError(absl::StrCat(
         "Decode function has been called more times than the number of "
@@ -135,6 +138,7 @@ absl::Status FakeLlmExecutor::Decode(::litert::TensorBuffer& output_tokens) {
 
 absl::Status FakeLlmExecutor::Decode(const ExecutorInputs& inputs,
                                      ::litert::TensorBuffer& output_logits) {
+  RETURN_IF_ERROR(decode_status_);
   if (decode_times_ >= decode_tokens_set_.size()) {
     return absl::InvalidArgumentError(absl::StrCat(
         "Decode function has been called more times than the number of "
@@ -157,6 +161,7 @@ absl::Status FakeLlmExecutor::Decode(const ExecutorInputs& inputs,
 
 absl::StatusOr<::litert::TensorBuffer> FakeLlmExecutor::DecodeLogits(
     const ExecutorInputs& inputs) {
+  RETURN_IF_ERROR(decode_status_);
   if (decode_times_ >= decode_tokens_set_.size()) {
     return absl::InvalidArgumentError(absl::StrCat(
         "Decode function has been called more times than the number of "

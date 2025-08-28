@@ -72,6 +72,14 @@ class FakeLlmExecutor : public LlmExecutor {
     return current_step_;
   }
 
+  // Sets the status to be returned by the Prefill function.
+  void SetPrefillStatus(const absl::Status& status) {
+    prefill_status_ = status;
+  }
+
+  // Sets the status to be returned by the Decode function.
+  void SetDecodeStatus(const absl::Status& status) { decode_status_ = status; }
+
  private:
   int vocab_size_;
   std::vector<std::vector<int>> prefill_tokens_set_;
@@ -88,6 +96,11 @@ class FakeLlmExecutor : public LlmExecutor {
 
   // The current step of the executor.
   int current_step_;
+
+  // The status to be returned by the Prefill function.
+  absl::Status prefill_status_ = absl::OkStatus();
+  // The status to be returned by the Decode function.
+  absl::Status decode_status_ = absl::OkStatus();
 };
 
 }  // namespace litert::lm
