@@ -427,7 +427,6 @@ cc_library(
         "@com_google_absl//absl/strings:string_view",
         "@litert//litert/cc:litert_buffer_ref",
         "@litert//litert/cc:litert_macros",
-        "@litert//litert/cc:litert_model",
         "//runtime/proto:llm_metadata_cc_proto",
         "//runtime/util:litert_lm_loader",
         "//runtime/util:litert_status_util",
@@ -437,6 +436,13 @@ cc_library(
     }) + select({
         ":disable_sentencepiece_tokenizer": [],
         "//conditions:default": [":sentencepiece_tokenizer"],
+    }) + select({
+        "@litert//litert:litert_link_capi_so": [
+            "@litert//litert/cc:litert_model",
+        ],
+        "//conditions:default": [
+            "@litert//litert/cc/internal:litert_model",
+        ],
     }),
 )
 
@@ -449,9 +455,15 @@ cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:string_view",
-        "@litert//litert/cc:litert_model",
         "//runtime/proto:llm_metadata_cc_proto",
-    ],
+    ] + select({
+        "@litert//litert:litert_link_capi_so": [
+            "@litert//litert/cc:litert_model",
+        ],
+        "//conditions:default": [
+            "@litert//litert/cc/internal:litert_model",
+        ],
+    }),
 )
 
 cc_library(
@@ -473,12 +485,18 @@ cc_library(
         "@com_google_absl//absl/strings:string_view",
         "@litert//litert/cc:litert_buffer_ref",
         "@litert//litert/cc:litert_macros",
-        "@litert//litert/cc:litert_model",
         "//runtime/proto:llm_metadata_cc_proto",
         "//runtime/util:litert_status_util",
         "//runtime/util:metadata_util",
         "//runtime/util:model_asset_bundle_resources",
-    ],
+    ] + select({
+        "@litert//litert:litert_link_capi_so": [
+            "@litert//litert/cc:litert_model",
+        ],
+        "//conditions:default": [
+            "@litert//litert/cc/internal:litert_model",
+        ],
+    }),
 )
 
 cc_library(

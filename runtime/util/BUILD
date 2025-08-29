@@ -32,12 +32,13 @@ cc_library(
         "@litert//litert/cc:litert_expected",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_macros",
-        "@litert//litert/cc:litert_model",
     ] + select({
         "@litert//litert:litert_link_capi_so": [
+            "@litert//litert/cc:litert_model",
             "@litert//litert/cc:litert_tensor_buffer",
         ],
         "//conditions:default": [
+            "@litert//litert/cc/internal:litert_model",
             "@litert//litert/cc/internal:litert_tensor_buffer",
         ],
     }),
@@ -53,13 +54,14 @@ cc_test(
         "@litert//litert/c:litert_common",
         "@litert//litert/c:litert_tensor_buffer_types",
         "@litert//litert/cc:litert_layout",
-        "@litert//litert/cc:litert_model",
         "@litert//litert/test:matchers",
     ] + select({
         "@litert//litert:litert_link_capi_so": [
+            "@litert//litert/cc:litert_model",
             "@litert//litert/cc:litert_tensor_buffer",
         ],
         "//conditions:default": [
+            "@litert//litert/cc/internal:litert_model",
             "@litert//litert/cc/internal:litert_tensor_buffer",
         ],
     }),
@@ -198,12 +200,13 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@litert//litert/c:litert_tensor_buffer",
         "@litert//litert/cc:litert_element_type",
-        "@litert//litert/cc:litert_model",
     ] + select({
         "@litert//litert:litert_link_capi_so": [
+            "@litert//litert/cc:litert_model",
             "@litert//litert/cc:litert_tensor_buffer",
         ],
         "//conditions:default": [
+            "@litert//litert/cc/internal:litert_model",
             "@litert//litert/cc/internal:litert_tensor_buffer",
         ],
     }),
