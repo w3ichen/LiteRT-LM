@@ -93,6 +93,29 @@ cc_test(
     }),
 )
 
+cc_library(
+    name = "litert_lm_lib",
+    srcs = ["litert_lm_lib.cc"],
+    hdrs = ["litert_lm_lib.h"],
+    deps = [
+        ":engine_interface",
+        ":engine_settings",
+        ":io_types",
+        "@com_google_absl//absl/log:absl_check",
+        "@com_google_absl//absl/log:absl_log",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:string_view",
+        "@com_google_absl//absl/time",
+        "//runtime/executor:executor_settings_base",
+        "//runtime/executor:llm_executor_settings",
+        "//runtime/util:litert_status_util",
+        "@litert//tflite/profiling:memory_usage_monitor",
+    ] + select({
+        "//conditions:default": ["//runtime/core:engine_impl"],
+    }),
+)
+
 cc_binary(
     name = "litert_lm_main",
     srcs = ["litert_lm_main.cc"],
@@ -108,29 +131,16 @@ cc_binary(
         "//conditions:default": [],
     }),
     deps = [
-        ":engine_interface",
-        ":engine_settings",
-        ":io_types",
+        ":litert_lm_lib",
         "@com_google_absl//absl/base:log_severity",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
         "@com_google_absl//absl/log:absl_check",
         "@com_google_absl//absl/log:absl_log",
-        "@com_google_absl//absl/log:check",
-        "@com_google_absl//absl/log:flags",  # buildcleaner: keep
         "@com_google_absl//absl/log:globals",
         "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings:string_view",
-        "@com_google_absl//absl/time",
         "@litert//litert/c:litert_logging",
-        "//runtime/executor:executor_settings_base",
-        "//runtime/executor:llm_executor_settings",
-        "//runtime/util:litert_status_util",
-        "@litert//tflite/profiling:memory_usage_monitor",
-    ] + select({
-        "//conditions:default": ["//runtime/core:engine_impl"],
-    }),
+    ],
 )
 
 cc_library(
