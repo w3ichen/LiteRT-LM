@@ -42,7 +42,7 @@ namespace litert::lm {
 absl::StatusOr<std::unique_ptr<EmbeddingLookupManager>>
 EmbeddingLookupManager::Create(
     const litert::Model* absl_nonnull text_embedding_model,
-    absl::flat_hash_map<int, litert::Model*>&
+    absl::flat_hash_map<int, const litert::Model*>&
         end_of_multi_modal_embedding_models,
     bool fully_supports_multi_modal, std::optional<std::string> signature_key) {
   auto embedding_lookup_manager = std::make_unique<EmbeddingLookupManager>();
@@ -56,7 +56,8 @@ absl::StatusOr<std::unique_ptr<EmbeddingLookupManager>>
 EmbeddingLookupManager::Create(
     const litert::Model* absl_nonnull text_embedding_model,
     bool fully_supports_multi_modal, std::optional<std::string> signature_key) {
-  absl::flat_hash_map<int, litert::Model*> end_of_multi_modal_embedding_models;
+  absl::flat_hash_map<int, const litert::Model*>
+      end_of_multi_modal_embedding_models;
   return Create(text_embedding_model, end_of_multi_modal_embedding_models,
                 fully_supports_multi_modal, signature_key);
 }
@@ -216,7 +217,7 @@ absl::Status EmbeddingLookupManager::LookupPrefill(
 
 absl::Status EmbeddingLookupManager::Initialize(
     const litert::Model* absl_nonnull text_embedding_model,
-    absl::flat_hash_map<int, litert::Model*>&
+    absl::flat_hash_map<int, const litert::Model*>&
         end_of_multi_modal_embedding_models,
     bool fully_supports_multi_modal, std::optional<std::string> signature_key) {
   if (!fully_supports_multi_modal &&

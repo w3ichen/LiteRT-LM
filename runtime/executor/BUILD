@@ -136,7 +136,7 @@ cc_library(
         "//runtime/components:model_resources_task",
         "//runtime/components:sampler",
         "//runtime/components:sampler_factory",
-        "//runtime/components/embedding_lookup:embedding_lookup_text",
+        "//runtime/components/embedding_lookup:embedding_lookup_manager",
         "//runtime/util:convert_tensor_buffer",
         "//runtime/util:file_util",
         "//runtime/util:litert_status_util",

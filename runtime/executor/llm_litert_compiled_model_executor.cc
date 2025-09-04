@@ -41,7 +41,7 @@
 #include "litert/cc/options/litert_cpu_options.h"  // from @litert
 #include "litert/cc/options/litert_gpu_options.h"  // from @litert
 #include "litert/cc/options/litert_runtime_options.h"  // from @litert
-#include "runtime/components/embedding_lookup/embedding_lookup_text.h"
+#include "runtime/components/embedding_lookup/embedding_lookup_manager.h"
 #include "runtime/components/model_resources.h"
 #include "runtime/components/sampler_factory.h"
 #include "runtime/executor/executor_settings_base.h"
@@ -85,6 +85,41 @@ absl::Status GetCacheRootNames(std::vector<absl::string_view> input_names,
 
 bool IsCalculationPrecisionF16() { return true; }
 
+absl::Status InitializeEmbeddingLookups(
+    ModelResources& resources,
+    std::unique_ptr<EmbeddingLookupManager>& embedding_lookup,
+    std::unique_ptr<EmbeddingLookupManager>& per_layer_embedding_lookup) {
+  // Create embedding lookups from the resources.
+  auto text_embedder_model =
+      resources.GetTFLiteModel(ModelType::kTfLiteEmbedder);
+  auto end_of_audio_model =
+      resources.GetTFLiteModel(ModelType::kTfLiteEndOfAudio);
+  absl::flat_hash_map<int, const litert::Model*>
+      end_of_multi_modal_embedding_models;
+  if (end_of_audio_model.ok()) {
+    end_of_multi_modal_embedding_models.insert(
+        {ExecutorAudioData::kEndToken, end_of_audio_model.value()});
+  }
+  ABSL_LOG(INFO) << "text embedder model ok: " << text_embedder_model.status();
+  if (text_embedder_model.ok()) {
+    ASSIGN_OR_RETURN(
+        embedding_lookup,
+        EmbeddingLookupManager::Create(*text_embedder_model,
+                                       end_of_multi_modal_embedding_models));
+  }
+
+  // Create per layer embedding lookups from the resources.
+  auto per_layer_embedder_model =
+      resources.GetTFLiteModel(ModelType::kTfLitePerLayerEmbedder);
+  if (per_layer_embedder_model.ok()) {
+    ASSIGN_OR_RETURN(
+        per_layer_embedding_lookup,
+        EmbeddingLookupManager::Create(*per_layer_embedder_model,
+                                       /*fully_supports_multi_modal=*/false));
+  }
+  return absl::OkStatus();
+}
+
 }  // namespace
 
 absl::Status LlmLiteRtCompiledModelExecutor::Prefill(
@@ -97,6 +132,9 @@ absl::Status LlmLiteRtCompiledModelExecutor::Prefill(
       << "Prefill token ids must be non-empty.";
   LITERT_ASSIGN_OR_RETURN_ABSL(auto ids, ReferTensorBufferAsSpan<int32_t>(
                                              *(*inputs.GetTextTokenIdsPtr())));
+  if (embedding_lookup_ != nullptr) {
+    RETURN_IF_ERROR(embedding_lookup_->UpdateMultiModalEmbeddings(inputs));
+  }
 
   ASSIGN_OR_RETURN(auto work_groups, GetOptimizedPrefillWorkGroups(
                                          prefill_signature_map_, ids.size()));
@@ -835,22 +873,10 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
                        /*input_positions_name=*/signatures.input_positions));
   RET_CHECK(!prefill_runner_set.empty()) << "No prefill runner available.";
 
-  // Create embedding lookups from the resources.
-  std::unique_ptr<EmbeddingLookupText> embedding_lookup;
-  auto embedder_model = resources.GetTFLiteModel(ModelType::kTfLiteEmbedder);
-  if (embedder_model.ok()) {
-    ASSIGN_OR_RETURN(embedding_lookup,  // NOLINT
-                     EmbeddingLookupText::Create(*embedder_model));
-  }
-
-  // Create per layer embedding lookups from the resources.
-  std::unique_ptr<EmbeddingLookupText> per_layer_embedding_lookup;
-  auto per_layer_embedder_model =
-      resources.GetTFLiteModel(ModelType::kTfLitePerLayerEmbedder);
-  if (per_layer_embedder_model.ok()) {
-    ASSIGN_OR_RETURN(per_layer_embedding_lookup,  // NOLINT
-                     EmbeddingLookupText::Create(*per_layer_embedder_model));
-  }
+  std::unique_ptr<EmbeddingLookupManager> embedding_lookup;
+  std::unique_ptr<EmbeddingLookupManager> per_layer_embedding_lookup;
+  RETURN_IF_ERROR(InitializeEmbeddingLookups(resources, embedding_lookup,
+                                             per_layer_embedding_lookup));
 
   return absl::WrapUnique(new LlmLiteRtCompiledModelExecutor(
       std::move(executor_settings), std::move(*lrt_env), litert_model,

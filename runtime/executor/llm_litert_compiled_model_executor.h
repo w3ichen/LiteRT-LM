@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef THIRD_PARTY_ODML_INFRA_GENAI_INFERENCE_EXECUTOR_LLM_TFLITE_GPU_EXECUTOR_H_
-#define THIRD_PARTY_ODML_INFRA_GENAI_INFERENCE_EXECUTOR_LLM_TFLITE_GPU_EXECUTOR_H_
+#ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LLM_LITERT_COMPILED_MODEL_EXECUTOR_H_
+#define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LLM_LITERT_COMPILED_MODEL_EXECUTOR_H_
 
 #include <memory>
 #include <string>
@@ -31,7 +31,7 @@
 #include "litert/cc/litert_environment.h"  // from @litert
 #include "litert/cc/litert_model.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
-#include "runtime/components/embedding_lookup/embedding_lookup_text.h"
+#include "runtime/components/embedding_lookup/embedding_lookup_manager.h"
 #include "runtime/components/model_resources.h"
 #include "runtime/components/sampler.h"
 #include "runtime/executor/executor_settings_base.h"
@@ -123,8 +123,9 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
           output_kv_cache_buffers,
       SortedPrefillSignatureMap prefill_signature_map,
       ModelSignatures signatures, int batch_size, std::string weight_cache_path,
-      std::unique_ptr<EmbeddingLookupText> embedding_lookup = nullptr,
-      std::unique_ptr<EmbeddingLookupText> per_layer_embedding_lookup = nullptr,
+      std::unique_ptr<EmbeddingLookupManager> embedding_lookup = nullptr,
+      std::unique_ptr<EmbeddingLookupManager> per_layer_embedding_lookup =
+          nullptr,
       LogitsDataType logits_data_type = LogitsDataType::FLOAT32)
       : executor_settings_(std::move(executor_settings)),
         env_(std::move(env)),
@@ -222,9 +223,11 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
   std::string weight_cache_path_;
 
   // The embedding lookup for the optional embedder model.
-  std::unique_ptr<EmbeddingLookupText> embedding_lookup_;
+  std::unique_ptr<EmbeddingLookupManager> embedding_lookup_;
+
   // The embedding lookup for the optional per layer embedder model.
-  std::unique_ptr<EmbeddingLookupText> per_layer_embedding_lookup_;
+  std::unique_ptr<EmbeddingLookupManager> per_layer_embedding_lookup_;
+
   // The logits data type of the model, used to determine the data type of the
   // logits tensor for gpu sampling.
   LogitsDataType logits_data_type_;
@@ -232,4 +235,4 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
 
 }  // namespace litert::lm
 
-#endif  // THIRD_PARTY_ODML_INFRA_GENAI_INFERENCE_EXECUTOR_LLM_TFLITE_GPU_EXECUTOR_H_
+#endif  // THIRD_PARTY_ODML_LITERT_LM_RUNTIME_EXECUTOR_LLM_LITERT_COMPILED_MODEL_EXECUTOR_H_

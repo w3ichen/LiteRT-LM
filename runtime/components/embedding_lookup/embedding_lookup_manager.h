@@ -53,7 +53,7 @@ class EmbeddingLookupManager {
   // signature_key must be provided.
   static absl::StatusOr<std::unique_ptr<EmbeddingLookupManager>> Create(
       const litert::Model* absl_nonnull text_embedding_model,
-      absl::flat_hash_map<int, litert::Model*>&
+      absl::flat_hash_map<int, const litert::Model*>&
           end_of_multi_modal_embedding_models,
       bool fully_supports_multi_modal = true,
       std::optional<std::string> signature_key = std::nullopt);
@@ -112,7 +112,7 @@ class EmbeddingLookupManager {
  protected:
   absl::Status Initialize(
       const litert::Model* absl_nonnull text_embedding_model,
-      absl::flat_hash_map<int, litert::Model*>&
+      absl::flat_hash_map<int, const litert::Model*>&
           end_of_multi_modal_embedding_models,
       bool fully_supports_multi_modal,
       std::optional<std::string> signature_key);

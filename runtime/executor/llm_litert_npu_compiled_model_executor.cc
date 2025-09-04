@@ -1257,13 +1257,13 @@ LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3n(
   SortedPrefillSignatureMap prefill_runner_set;
   prefill_runner_set[kPrefillSize] = kPrefillSignature;
 
-  absl::flat_hash_map<int, Model*> end_of_multi_modal_embedding_models;
+  absl::flat_hash_map<int, const Model*> end_of_multi_modal_embedding_models;
   absl::StatusOr<const litert::Model*> maybe_end_of_audio_model =
       resources.GetTFLiteModel(ModelType::kTfLiteEndOfAudio);
   if (maybe_end_of_audio_model.ok()) {
     end_of_multi_modal_embedding_models
         [litert::lm::ExecutorAudioData::kEndToken] =
-            const_cast<Model*>(maybe_end_of_audio_model.value());
+            maybe_end_of_audio_model.value();
   }
   ASSIGN_OR_RETURN(
       std::unique_ptr<EmbeddingLookupManager> embedding_lookup_manager,

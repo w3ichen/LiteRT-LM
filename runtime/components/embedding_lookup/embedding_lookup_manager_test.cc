@@ -74,7 +74,7 @@ class EmbeddingLookupManagerTest : public ::testing::Test {
     }
     end_of_multi_modal_model_ = std::move(*end_of_multi_modal_model);
 
-    absl::flat_hash_map<int, Model*> end_of_multi_modal_embedding_models;
+    absl::flat_hash_map<int, const Model*> end_of_multi_modal_embedding_models;
     end_of_multi_modal_embedding_models.insert(
         {-3, &end_of_multi_modal_model_});
 
@@ -1451,7 +1451,8 @@ TEST_F(EmbeddingLookupManagerTest,
 
 TEST_F(EmbeddingLookupManagerTest,
        CreateWithPartialMultiModalSupportAndEndOfMultiModalEmbeddings) {
-  absl::flat_hash_map<int, litert::Model*> end_of_multi_modal_embedding_models;
+  absl::flat_hash_map<int, const litert::Model*>
+      end_of_multi_modal_embedding_models;
   end_of_multi_modal_embedding_models.insert({-3, &end_of_multi_modal_model_});
   auto status = EmbeddingLookupManager::Create(
       &text_embedding_model_, end_of_multi_modal_embedding_models,
