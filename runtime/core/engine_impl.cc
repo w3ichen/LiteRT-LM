@@ -77,8 +77,8 @@ class EngineImpl : public Engine {
       ABSL_CHECK_OK(
           benchmark_info_->TimeInitPhaseStart("Executor initialization"));
     }
-    auto& model_assets = engine_settings_.GetMutableMainExecutorSettings()
-                             .GetMutableModelAssets();
+    const auto& model_assets =
+        engine_settings_.GetMutableMainExecutorSettings().GetModelAssets();
 
     auto model_resources = BuildLiteRtCompiledModelResources(model_assets);
     ABSL_CHECK_OK(model_resources);

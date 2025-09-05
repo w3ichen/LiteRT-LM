@@ -147,7 +147,6 @@ class ExecutorSettingsBase {
  public:
   // Getter APIs.
   const ModelAssets& GetModelAssets() const { return model_assets_; }
-  ModelAssets& GetMutableModelAssets() { return model_assets_; }
 
   // Backend APIs.
   const Backend& GetBackend() const { return backend_; }
