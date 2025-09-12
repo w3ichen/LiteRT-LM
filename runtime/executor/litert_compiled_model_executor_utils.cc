@@ -20,6 +20,7 @@
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -156,7 +157,6 @@ bool IsExternalEmbeddingModel(
          Contains(input_names, kExternalEmbeddingsModel_InputPositions) &&
          Contains(input_names, kExternalEmbeddingsModel_InputAttnMask) &&
          Contains(input_names, kExternalEmbeddingsModel_Embeddings) &&
-         Contains(input_names, kExternalEmbeddingsModel_PerLayerEmbeddings) &&
          Contains(output_names, kExternalEmbeddingsModel_OutputLogits);
 }
 
@@ -229,7 +229,10 @@ absl::StatusOr<ModelSignatures> GetModelSignaturesFromInputOutputNames(
         .input_attn_mask = kExternalEmbeddingsModel_InputAttnMask,
         .input_embeddings = kExternalEmbeddingsModel_Embeddings,
         .input_per_layer_embeddings =
-            kExternalEmbeddingsModel_PerLayerEmbeddings,
+            Contains(input_names, kExternalEmbeddingsModel_PerLayerEmbeddings)
+                ? std::make_optional(
+                      kExternalEmbeddingsModel_PerLayerEmbeddings)
+                : std::nullopt,
         .output_logits = kExternalEmbeddingsModel_OutputLogits,
     };
   }

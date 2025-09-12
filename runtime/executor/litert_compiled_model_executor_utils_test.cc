@@ -110,6 +110,21 @@ TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
 }
 
 TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
+     GetModelSignaturesFromInputOutputNames_ExternalEmbeddingModelWithoutPle) {
+  std::vector<absl::string_view> input_names = {"input_pos", "mask",
+                                                "embeddings"};
+  std::vector<absl::string_view> output_names = {"logits"};
+  ASSERT_OK_AND_ASSIGN(auto signatures, GetModelSignaturesFromInputOutputNames(
+                                            input_names, output_names));
+  EXPECT_TRUE(signatures.input_tokens.empty());
+  EXPECT_EQ(signatures.input_positions, "input_pos");
+  EXPECT_EQ(signatures.input_attn_mask, "mask");
+  EXPECT_EQ(signatures.input_embeddings, "embeddings");
+  EXPECT_FALSE(signatures.input_per_layer_embeddings.has_value());
+  EXPECT_EQ(signatures.output_logits, "logits");
+}
+
+TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
      GetModelSignaturesFromInputOutputNames_Unsupported) {
   std::vector<absl::string_view> input_names = {"unknown_input"};
   std::vector<absl::string_view> output_names = {"logits"};
@@ -144,8 +159,8 @@ TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
   // 1100 = 1024 + 76. The smallest runner >= 76 is prefill_128.
   ASSERT_OK_AND_ASSIGN(auto work_groups,
                        GetOptimizedPrefillWorkGroups(prefill_runner_set, 1100));
-  EXPECT_THAT(work_groups, ElementsAre(Pair("prefill_1024", 1024),
-                                       Pair("prefill_128", 76)));
+  EXPECT_THAT(work_groups,
+              ElementsAre(Pair("prefill_1024", 1024), Pair("prefill_128", 76)));
 }
 
 TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
@@ -164,8 +179,8 @@ TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
   // 600 = 512 + 88. The smallest runner >= 88 is prefill_128.
   ASSERT_OK_AND_ASSIGN(auto work_groups,
                        GetOptimizedPrefillWorkGroups(prefill_runner_set, 600));
-  EXPECT_THAT(work_groups, ElementsAre(Pair("prefill_512", 512),
-                                       Pair("prefill_128", 88)));
+  EXPECT_THAT(work_groups,
+              ElementsAre(Pair("prefill_512", 512), Pair("prefill_128", 88)));
 }
 
 TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
