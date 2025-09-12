@@ -35,6 +35,7 @@
 #include "absl/time/time.h"  // from @com_google_absl
 #include "absl/types/span.h"  // from @com_google_absl
 #include "litert/c/litert_common.h"  // from @litert
+#include "litert/c/options/litert_qualcomm_options.h"  // from @litert
 #include "litert/cc/litert_compiled_model.h"  // from @litert
 #include "litert/cc/litert_element_type.h"  // from @litert
 #include "litert/cc/litert_environment.h"  // from @litert
@@ -42,7 +43,9 @@
 #include "litert/cc/litert_layout.h"  // from @litert
 #include "litert/cc/litert_macros.h"  // from @litert
 #include "litert/cc/litert_model.h"  // from @litert
+#include "litert/cc/litert_options.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
+#include "litert/cc/options/litert_qualcomm_options.h"  // from @litert
 #include "runtime/components/embedding_lookup/embedding_lookup_manager.h"
 #include "runtime/components/model_resources.h"
 #include "runtime/executor/litert_compiled_model_executor_utils.h"
@@ -67,6 +70,8 @@ constexpr char cache_k25[] = "kv_cache_k_25";
 constexpr char cache_v25[] = "kv_cache_v_25";
 constexpr char cache_k19[] = "kv_cache_k_19";
 constexpr char cache_v19[] = "kv_cache_v_19";
+constexpr char cache_k17[] = "kv_cache_k_17";
+constexpr char cache_v17[] = "kv_cache_v_17";
 
 // Signature names for the embedder.
 struct EmbedderSignatures {
@@ -1154,15 +1159,29 @@ LlmLiteRtNpuCompiledModelExecutor::Create(
   }
 };
 
+// Creates LiteRT options for NPU accelerator.
+litert::Expected<litert::Options> CreateLiteRtOptions() {
+  LITERT_ASSIGN_OR_RETURN(auto options, ::litert::Options::Create());
+  options.SetHardwareAccelerators(kLiteRtHwAcceleratorCpu);
+  LITERT_ASSIGN_OR_RETURN(auto qnn_opts,
+                          ::litert::qualcomm::QualcommOptions::Create());
+  qnn_opts.SetLogLevel(kLiteRtQualcommLogOff);
+  qnn_opts.SetHtpPerformanceMode(kLiteRtQualcommHtpPerformanceModeBurst);
+  options.AddOpaqueOptions(std::move(qnn_opts));
+  return options;
+}
+
 absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
 LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3n(
     const LlmExecutorSettings& executor_settings, ModelResources& resources,
     litert::Environment& env, const litert::Model* transformer_model) {
   // If the model is fully AOT compiled for NPU, NPU accelerator is used
   // automatically.
+  // Set up LiteRt options.
+  LITERT_ASSIGN_OR_RETURN(auto options, CreateLiteRtOptions());
   LITERT_ASSIGN_OR_RETURN(
       CompiledModel llm_compiled_model,
-      CompiledModel::Create(env, *transformer_model, kLiteRtHwAcceleratorCpu));
+      CompiledModel::Create(env, *transformer_model, options));
 
   // Allocate all input and output buffers of the LLM model that are meant to be
   // used by the NPU chip first, so that we can later duplicate the buffers into
@@ -1302,9 +1321,10 @@ LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3(
     litert::Environment& env, const litert::Model* transformer_model) {
   // If the model is fully AOT compiled for NPU, NPU accelerator is used
   // automatically.
+  LITERT_ASSIGN_OR_RETURN(auto options, CreateLiteRtOptions());
   LITERT_ASSIGN_OR_RETURN(
       CompiledModel llm_compiled_model,
-      CompiledModel::Create(env, *transformer_model, kLiteRtHwAcceleratorCpu));
+      CompiledModel::Create(env, *transformer_model, options));
 
   // Allocate all input and output buffers of the LLM model that are meant to be
   // used by the NPU chip first, so that we can later duplicate the buffers into
@@ -1346,12 +1366,22 @@ LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3(
   // fail). Luckily these buffers are not used, so we can simply create new
   // ones to satisfy the compiled model run API.  We can remove this
   // workaround once we have a model that removes these buffers.
-  LITERT_ASSIGN_OR_RETURN(
-      llm_inference_context.decode_input_buffers[cache_k25],
-      llm_compiled_model.CreateInputBuffer(kDecodeSignature, cache_k25));
-  LITERT_ASSIGN_OR_RETURN(
-      llm_inference_context.decode_input_buffers[cache_v25],
-      llm_compiled_model.CreateInputBuffer(kDecodeSignature, cache_v25));
+  if (input_kv_cache_buffers.contains(cache_k25)) {
+    LITERT_ASSIGN_OR_RETURN(
+        llm_inference_context.decode_input_buffers[cache_k25],
+        llm_compiled_model.CreateInputBuffer(kDecodeSignature, cache_k25));
+    LITERT_ASSIGN_OR_RETURN(
+        llm_inference_context.decode_input_buffers[cache_v25],
+        llm_compiled_model.CreateInputBuffer(kDecodeSignature, cache_v25));
+  } else {
+    // Tiny Gemma 270M specific fix:
+    LITERT_ASSIGN_OR_RETURN(
+        llm_inference_context.decode_input_buffers[cache_k17],
+        llm_compiled_model.CreateInputBuffer(kDecodeSignature, cache_k17));
+    LITERT_ASSIGN_OR_RETURN(
+        llm_inference_context.decode_input_buffers[cache_v17],
+        llm_compiled_model.CreateInputBuffer(kDecodeSignature, cache_v17));
+  }
 
   ASSIGN_OR_RETURN(auto npu_auxiliary_lrt_model,
                    resources.GetTFLiteModel(ModelType::kTfLiteAux));

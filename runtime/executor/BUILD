@@ -352,6 +352,7 @@ cc_library(
         "//conditions:default": [
             "@litert//litert/c:litert_common",
             "@litert//litert/c:litert_model",
+            "@litert//litert/c/options:litert_qualcomm_options",
             "@litert//litert/cc:litert_compiled_model",
             "@litert//litert/cc:litert_element_type",
             "@litert//litert/cc:litert_environment",
