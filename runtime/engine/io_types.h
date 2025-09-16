@@ -35,13 +35,19 @@ namespace litert::lm {
 // A container to host the input text.
 class InputText {
  public:
-  // Constructs an InputText from a raw text. The InputText takes ownership of
-  // the provided `text`.
-  explicit InputText(std::string text) : data_(std::move(text)) {}
-  // Constructs an InputText from a TensorBuffer. The InputText takes
-  // ownership of the provided `text_tensor`.
-  explicit InputText(TensorBuffer text_tensor)
-      : data_(std::move(text_tensor)) {}
+  // Constructs an InputText from a raw text string or a TensorBuffer of token
+  // ids. The InputText takes ownership of the provided data.
+  explicit InputText(std::variant<std::string, TensorBuffer> data)
+      : data_(std::move(data)) {}
+
+  // Copy constructor.
+  InputText(const InputText& other) = delete;
+  // Copy assignment operator.
+  InputText& operator=(const InputText& other) = delete;
+  // Move constructor.
+  InputText(InputText&& other) = default;
+  // Move assignment operator.
+  InputText& operator=(InputText&& other) = default;
 
   // Returns true if the text is preprocessed into a TensorBuffer.
   bool IsTensorBuffer() const {
@@ -74,14 +80,19 @@ class InputText {
 // A container to host the input image.
 class InputImage {
  public:
-  // Constructs an InputImage from a raw image bytes. The InputImage takes
-  // ownership of the provided `image_bytes`.
-  explicit InputImage(std::string image_bytes)
-      : data_(std::move(image_bytes)) {}
-  // Constructs an InputImage from a TensorBuffer. The InputImage takes
-  // ownership of the provided `image_tensor`.
-  explicit InputImage(TensorBuffer image_tensor)
-      : data_(std::move(image_tensor)) {}
+  // Constructs an InputImage from a raw image bytes string or a TensorBuffer of
+  // processed image bytes. The InputImage takes ownership of the provided data.
+  explicit InputImage(std::variant<std::string, TensorBuffer> data)
+      : data_(std::move(data)) {}
+
+  // Copy constructor.
+  InputImage(const InputImage& other) = delete;
+  // Copy assignment operator.
+  InputImage& operator=(const InputImage& other) = delete;
+  // Move constructor.
+  InputImage(InputImage&& other) = default;
+  // Move assignment operator.
+  InputImage& operator=(InputImage&& other) = default;
 
   // Returns true if the image is preprocessed into a TensorBuffer.
   bool IsTensorBuffer() const {
@@ -114,14 +125,19 @@ class InputImage {
 // A container to host the input audio.
 class InputAudio {
  public:
-  // Constructs an InputAudio from a raw audio bytes. The InputAudio takes
-  // ownership of the provided `audio_bytes`.
-  explicit InputAudio(std::string audio_bytes)
-      : data_(std::move(audio_bytes)) {}
-  // Constructs an InputAudio from a TensorBuffer. The InputAudio takes
-  // ownership of the provided `audio_tensor`.
-  explicit InputAudio(TensorBuffer audio_tensor)
-      : data_(std::move(audio_tensor)) {}
+  // Constructs an InputAudio from a raw audio bytes string or a TensorBuffer of
+  // processed audio bytes. The InputAudio takes ownership of the provided data.
+  explicit InputAudio(std::variant<std::string, TensorBuffer> data)
+      : data_(std::move(data)) {}
+
+  // Copy constructor.
+  InputAudio(const InputAudio& other) = delete;
+  // Copy assignment operator.
+  InputAudio& operator=(const InputAudio& other) = delete;
+  // Move constructor.
+  InputAudio(InputAudio&& other) = default;
+  // Move assignment operator.
+  InputAudio& operator=(InputAudio&& other) = default;
 
   // Returns true if the audio is preprocessed into a TensorBuffer.
   bool IsTensorBuffer() const {

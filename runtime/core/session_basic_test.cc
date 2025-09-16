@@ -20,6 +20,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <gmock/gmock.h>
@@ -420,7 +421,44 @@ TEST_F(SessionBasicTest, GenerateContentStreamDecodeError) {
                                                 "Decode failed"));
 }
 
-TEST_F(SessionBasicTest, ApplyPromptTemplates) {
+TEST_F(SessionBasicTest, ApplyPromptTemplatesFails) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);  // Corresponds to "</s>"
+  session_config.SetSamplerBackend(Backend::CPU);
+  ASSERT_OK_AND_ASSIGN(auto executor, CreateFakeLlmExecutor(
+                                          /*prefill_tokens=*/{{}},
+                                          /*decode_tokens=*/{{}}));
+  ASSERT_OK_AND_ASSIGN(
+      auto session,
+      SessionBasic::Create(executor.get(), tokenizer_.get(),
+                           /*image_preprocessor=*/nullptr,
+                           /*vision_executor=*/nullptr,
+                           /*audio_preprocessor=*/nullptr,
+                           /*audio_executor=*/nullptr, session_config,
+                           std::nullopt, worker_thread_pool_.get()));
+
+  // Test Case 1: Input text starts with the BOS token string.
+  std::vector<InputData> inputs_with_bos;
+  inputs_with_bos.emplace_back(InputText("</s>Hello World!"));
+  EXPECT_THAT(
+      session->ApplyPromptTemplates(inputs_with_bos),
+      testing::status::StatusIs(absl::StatusCode::kInvalidArgument,
+                                "Input contains bos control token. Control "
+                                "token should not be included in the input."));
+
+  // Test Case 2: Empty input. ApplyPromptTemplates returns an empty vector,
+  // which is not an error at this stage. The error for empty content is
+  // handled in ProcessAndCombineContents.
+  std::vector<InputData> empty_inputs;
+  ASSERT_OK_AND_ASSIGN(auto templated_empty,
+                       session->ApplyPromptTemplates(empty_inputs));
+  EXPECT_TRUE(templated_empty.empty());
+}
+
+TEST_F(SessionBasicTest, ApplyPromptTemplatesWithSingleTextChunk) {
   const std::vector<std::vector<int>> stop_token_ids = {{2294}};
   SessionConfig session_config = SessionConfig::CreateDefault();
   session_config.GetMutableSamplerParams() = sampler_params_;
@@ -441,30 +479,289 @@ TEST_F(SessionBasicTest, ApplyPromptTemplates) {
           // "How's it going?"
           /*decode_tokens=*/{
               {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
-  auto session_or = SessionBasic::Create(
-      executor.get(), tokenizer_.get(),
-      /*image_preprocessor=*/nullptr,
-      /*vision_executor=*/nullptr, /*audio_preprocessor=*/nullptr,
-      /*audio_executor=*/nullptr, session_config, std::nullopt,
-      worker_thread_pool_.get());
-  ASSERT_OK(session_or);
-  auto session = std::move(*session_or);
-  // First chunk of the first turn will have the BOS token.
-  EXPECT_THAT(
-      session->ApplyPromptTemplates("Hello World!", /*is_first_chunk=*/true,
-                                    /*is_last_chunk=*/false),
-      testing::status::IsOkAndHolds("</s><test>User\nHello World!"));
-  // Both prefix and suffix will be added.
-  EXPECT_THAT(
-      session->ApplyPromptTemplates("Hello World!", /*is_first_chunk=*/true,
-                                    /*is_last_chunk=*/true),
-      testing::status::IsOkAndHolds(
-          "\n<test>User\nHello World!<end>\n<test>Model\n"));
-  // Only suffix will be added.
-  EXPECT_THAT(
-      session->ApplyPromptTemplates("Hello World!", /*is_first_chunk=*/false,
-                                    /*is_last_chunk=*/true),
-      testing::status::IsOkAndHolds("Hello World!<end>\n<test>Model\n"));
+
+  // Single text chunk. (is_first_chunk=true, is_last_chunk=true)
+  ASSERT_OK_AND_ASSIGN(
+      auto session,
+      SessionBasic::Create(executor.get(), tokenizer_.get(),
+                           /*image_preprocessor=*/nullptr,
+                           /*vision_executor=*/nullptr,
+                           /*audio_preprocessor=*/nullptr,
+                           /*audio_executor=*/nullptr, session_config,
+                           std::nullopt, worker_thread_pool_.get()));
+  std::vector<InputData> single_chunk;
+  single_chunk.emplace_back(InputText("Hello World!"));
+  ASSERT_OK_AND_ASSIGN(auto templated_single,
+                       session->ApplyPromptTemplates(single_chunk));
+  ASSERT_EQ(templated_single.size(), 1);
+  EXPECT_THAT(std::get<InputText>(templated_single[0]).GetRawTextString(),
+              testing::status::IsOkAndHolds(
+                  "</s><test>User\nHello World!<end>\n<test>Model\n"));
+}
+
+TEST_F(SessionBasicTest, ApplyPromptTemplatesWithTwoTextChunks) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  session_config.GetMutablePromptTemplates().mutable_user()->set_prefix(
+      "<test>User\n");
+  session_config.GetMutablePromptTemplates().mutable_user()->set_suffix(
+      "<end>\n");
+  session_config.GetMutablePromptTemplates().mutable_model()->set_prefix(
+      "<test>Model\n");
+  ASSERT_OK_AND_ASSIGN(
+      auto executor,
+      CreateFakeLlmExecutor(
+          // "Hello World!"
+          /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
+          // "How's it going?"
+          /*decode_tokens=*/{
+              {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
+
+  // Two text chunks. (First chunk: is_first=true, is_last=false;
+  // Second chunk: is_first=false, is_last=true)
+  ASSERT_OK_AND_ASSIGN(
+      auto session,
+      SessionBasic::Create(executor.get(), tokenizer_.get(),
+                           /*image_preprocessor=*/nullptr,
+                           /*vision_executor=*/nullptr,
+                           /*audio_preprocessor=*/nullptr,
+                           /*audio_executor=*/nullptr, session_config,
+                           std::nullopt, worker_thread_pool_.get()));
+  std::vector<InputData> two_chunks;
+  two_chunks.emplace_back(InputText("First"));
+  two_chunks.emplace_back(InputText("Second"));
+  ASSERT_OK_AND_ASSIGN(auto templated_two,
+                       session->ApplyPromptTemplates(two_chunks));
+  ASSERT_EQ(templated_two.size(), 2);
+  EXPECT_THAT(std::get<InputText>(templated_two[0]).GetRawTextString(),
+              testing::status::IsOkAndHolds("</s><test>User\nFirst"));
+  EXPECT_THAT(std::get<InputText>(templated_two[1]).GetRawTextString(),
+              testing::status::IsOkAndHolds("Second<end>\n<test>Model\n"));
+}
+
+TEST_F(SessionBasicTest, ApplyPromptTemplatesWithThreeTextChunks) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  session_config.GetMutablePromptTemplates().mutable_user()->set_prefix(
+      "<test>User\n");
+  session_config.GetMutablePromptTemplates().mutable_user()->set_suffix(
+      "<end>\n");
+  session_config.GetMutablePromptTemplates().mutable_model()->set_prefix(
+      "<test>Model\n");
+  ASSERT_OK_AND_ASSIGN(
+      auto executor,
+      CreateFakeLlmExecutor(
+          // "Hello World!"
+          /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
+          // "How's it going?"
+          /*decode_tokens=*/{
+              {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
+
+  // Three text chunks. (Middle chunk: is_first=false, is_last=false)
+  ASSERT_OK_AND_ASSIGN(
+      auto session,
+      SessionBasic::Create(executor.get(), tokenizer_.get(),
+                           /*image_preprocessor=*/nullptr,
+                           /*vision_executor=*/nullptr,
+                           /*audio_preprocessor=*/nullptr,
+                           /*audio_executor=*/nullptr, session_config,
+                           std::nullopt, worker_thread_pool_.get()));
+  std::vector<InputData> three_chunks;
+  three_chunks.emplace_back(InputText("First"));
+  three_chunks.emplace_back(InputText("Middle"));
+  three_chunks.emplace_back(InputText("Last"));
+  ASSERT_OK_AND_ASSIGN(auto templated_three,
+                       session->ApplyPromptTemplates(three_chunks));
+  ASSERT_EQ(templated_three.size(), 3);
+  EXPECT_THAT(std::get<InputText>(templated_three[0]).GetRawTextString(),
+              testing::status::IsOkAndHolds("</s><test>User\nFirst"));
+  EXPECT_THAT(std::get<InputText>(templated_three[1]).GetRawTextString(),
+              testing::status::IsOkAndHolds("Middle"));
+  EXPECT_THAT(std::get<InputText>(templated_three[2]).GetRawTextString(),
+              testing::status::IsOkAndHolds("Last<end>\n<test>Model\n"));
+}
+
+TEST_F(SessionBasicTest, ApplyPromptTemplatesWithMixedChunksTextAndImage) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  session_config.GetMutablePromptTemplates().mutable_user()->set_prefix(
+      "<test>User\n");
+  session_config.GetMutablePromptTemplates().mutable_user()->set_suffix(
+      "<end>\n");
+  session_config.GetMutablePromptTemplates().mutable_model()->set_prefix(
+      "<test>Model\n");
+  ASSERT_OK_AND_ASSIGN(
+      auto executor,
+      CreateFakeLlmExecutor(
+          // "Hello World!"
+          /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
+          // "How's it going?"
+          /*decode_tokens=*/{
+              {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
+
+  // Mixed chunks - text and image. Non-text inputs are passed through.
+  ASSERT_OK_AND_ASSIGN(
+      auto session,
+      SessionBasic::Create(executor.get(), tokenizer_.get(),
+                           /*image_preprocessor=*/nullptr,
+                           /*vision_executor=*/nullptr,
+                           /*audio_preprocessor=*/nullptr,
+                           /*audio_executor=*/nullptr, session_config,
+                           std::nullopt, worker_thread_pool_.get()));
+  std::vector<InputData> mixed_chunks;
+  mixed_chunks.emplace_back(InputText("Text1"));
+  mixed_chunks.emplace_back(InputImage("123"));
+  mixed_chunks.emplace_back(InputText("Text2"));
+  ASSERT_OK_AND_ASSIGN(auto templated_mixed,
+                       session->ApplyPromptTemplates(mixed_chunks));
+  ASSERT_EQ(templated_mixed.size(), 3);
+  EXPECT_THAT(std::get<InputText>(templated_mixed[0]).GetRawTextString(),
+              testing::status::IsOkAndHolds("</s><test>User\nText1"));
+  EXPECT_TRUE(std::holds_alternative<InputImage>(templated_mixed[1]));
+  EXPECT_THAT(std::get<InputText>(templated_mixed[2]).GetRawTextString(),
+              testing::status::IsOkAndHolds("Text2<end>\n<test>Model\n"));
+}
+
+TEST_F(SessionBasicTest, ApplyPromptTemplatesWithSubsequentTurn) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  session_config.GetMutablePromptTemplates().mutable_user()->set_prefix(
+      "<test>User\n");
+  session_config.GetMutablePromptTemplates().mutable_user()->set_suffix(
+      "<end>\n");
+  session_config.GetMutablePromptTemplates().mutable_model()->set_prefix(
+      "<test>Model\n");
+  ASSERT_OK_AND_ASSIGN(
+      auto executor,
+      CreateFakeLlmExecutor(
+          // "Hello World!"
+          /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
+          // "How's it going?"
+          /*decode_tokens=*/{
+              {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
+
+  // First turn is false (subsequent call).
+  // The first call to ApplyPromptTemplates sets is_first_turn_ to false.
+  ASSERT_OK_AND_ASSIGN(
+      auto session,
+      SessionBasic::Create(executor.get(), tokenizer_.get(),
+                           /*image_preprocessor=*/nullptr,
+                           /*vision_executor=*/nullptr,
+                           /*audio_preprocessor=*/nullptr,
+                           /*audio_executor=*/nullptr, session_config,
+                           std::nullopt, worker_thread_pool_.get()));
+  std::vector<InputData> single_chunk_again;
+  single_chunk_again.emplace_back(InputText("Another turn"));
+  ASSERT_OK_AND_ASSIGN(auto templated_first_turn,
+                       session->ApplyPromptTemplates(single_chunk_again));
+  ASSERT_EQ(templated_first_turn.size(), 1);
+  EXPECT_THAT(std::get<InputText>(templated_first_turn[0]).GetRawTextString(),
+              testing::status::IsOkAndHolds(
+                  "</s><test>User\nAnother turn<end>\n<test>Model\n"));
+  ASSERT_OK_AND_ASSIGN(auto templated_again,
+                       session->ApplyPromptTemplates(single_chunk_again));
+  ASSERT_EQ(templated_again.size(), 1);
+  EXPECT_THAT(std::get<InputText>(templated_again[0]).GetRawTextString(),
+              testing::status::IsOkAndHolds(
+                  "\n<test>User\nAnother turn<end>\n<test>Model\n"));
+}
+
+TEST_F(SessionBasicTest, ApplyPromptTemplatesWithSingleImageInput) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  session_config.GetMutablePromptTemplates().mutable_user()->set_prefix(
+      "<test>User\n");
+  session_config.GetMutablePromptTemplates().mutable_user()->set_suffix(
+      "<end>\n");
+  session_config.GetMutablePromptTemplates().mutable_model()->set_prefix(
+      "<test>Model\n");
+  ASSERT_OK_AND_ASSIGN(
+      auto executor,
+      CreateFakeLlmExecutor(
+          // "Hello World!"
+          /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
+          // "How's it going?"
+          /*decode_tokens=*/{
+              {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
+
+  // Single image input. Templates are applied to the first and
+  // last chunks. In this case, the image input is both the first and last
+  // chunks, and the text chunks (templates) will be added before and after the
+  // image.
+  ASSERT_OK_AND_ASSIGN(
+      auto session,
+      SessionBasic::Create(executor.get(), tokenizer_.get(),
+                           /*image_preprocessor=*/nullptr,
+                           /*vision_executor=*/nullptr,
+                           /*audio_preprocessor=*/nullptr,
+                           /*audio_executor=*/nullptr, session_config,
+                           std::nullopt, worker_thread_pool_.get()));
+  std::vector<InputData> single_image;
+  single_image.emplace_back(InputImage("456"));
+  ASSERT_OK_AND_ASSIGN(auto templated_image,
+                       session->ApplyPromptTemplates(single_image));
+  ASSERT_EQ(templated_image.size(), 3);
+  EXPECT_THAT(std::get<InputText>(templated_image[0]).GetRawTextString(),
+              testing::status::IsOkAndHolds("</s><test>User\n"));
+  EXPECT_TRUE(std::holds_alternative<InputImage>(templated_image[1]));
+  EXPECT_THAT(std::get<InputText>(templated_image[2]).GetRawTextString(),
+              testing::status::IsOkAndHolds("<end>\n<test>Model\n"));
+}
+
+TEST_F(SessionBasicTest, PreprocessContents) {
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.SetSamplerBackend(Backend::CPU);
+  session_config.SetStartTokenId(2);
+  ASSERT_OK_AND_ASSIGN(
+      auto executor,
+      CreateFakeLlmExecutor(
+          // "Hello World!"
+          /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
+          // "How's it going?"
+          /*decode_tokens=*/{
+              {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
+  ASSERT_OK_AND_ASSIGN(
+      auto session,
+      SessionBasic::Create(executor.get(), tokenizer_.get(),
+                           /*image_preprocessor=*/nullptr,
+                           /*vision_executor=*/nullptr,
+                           /*audio_preprocessor=*/nullptr,
+                           /*audio_executor=*/nullptr, session_config,
+                           std::nullopt, worker_thread_pool_.get()));
+  std::vector<InputData> contents;
+  contents.emplace_back(InputText("</s>Hello World!"));
+  ASSERT_OK_AND_ASSIGN(auto preprocessed_contents,
+                       session->PreprocessContents(contents));
+  ASSERT_EQ(preprocessed_contents.size(), 1);
+  ASSERT_TRUE(std::holds_alternative<InputText>(preprocessed_contents[0]));
+  const auto& text_data = std::get<InputText>(preprocessed_contents[0]);
+  ASSERT_TRUE(text_data.IsTensorBuffer());
+  ASSERT_OK_AND_ASSIGN(auto text_tensor, text_data.GetPreprocessedTextTensor());
+  ASSERT_NE(text_tensor, nullptr);
+  LITERT_ASSERT_OK_AND_ASSIGN(auto token_ids_span,
+                              ReferTensorBufferAsSpan<int>(*text_tensor));
+  EXPECT_THAT(std::vector<int>(token_ids_span.begin(), token_ids_span.end()),
+              testing::ElementsAre(2, 90, 547, 58, 735, 210, 466, 2294));
 }
 
 TEST_F(SessionBasicTest, CombineExecutorAudioDataEmptyFails) {
@@ -815,10 +1112,10 @@ TEST_F(SessionBasicTest, ProcessAndCombineContentsTextAndAudioSuccess) {
       auto executor,
       CreateFakeLlmExecutor(
           // "User:Hello World!<audio_tokens>[END]Model:"
-          /*prefill_tokens=*/{{2,    423, 8,   179, 29,   90,     547,
-                               58,   735, 210, 466, 2294, 256000, -2,
-                               -2,   -2,  -2,  -2,  -4,   433,    2172,
-                               1920, 432, 197, 979, 3076, 29}},
+          /*prefill_tokens=*/{{2,    423,  8,   179, 29,  207,  19,
+                               547,  58,   735, 210, 466, 2294, 256000,
+                               -2,   -2,   -2,  -2,  -2,  -4,   433,
+                               2172, 1920, 432, 197, 979, 3076, 29}},
           // "How's it going?"
           /*decode_tokens=*/
           {{224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}},
@@ -874,10 +1171,10 @@ TEST_F(SessionBasicTest, ProcessAndCombineContentsTextAudioTextSuccess) {
           // "User:Hello World!<audio_tokens>What does the audio say?[END]Model:" // NOLINT
           // clang-format on
           /*prefill_tokens=*/
-          {{2,   423,  8,      179, 29,  90,   547,  58, 735, 210,
-            466, 2294, 256000, -2,  -2,  -2,   -2,   -2, -4,  583,
-            378, 844,  166,    3,   14,  1252, 54,   58, 626, 2295,
-            433, 2172, 1920,   432, 197, 979,  3076, 29}},
+          {{2,    423,  8,    179,    29,  207, 19,   547,  58, 735,
+            210,  466,  2294, 256000, -2,  -2,  -2,   -2,   -2, -4,
+            583,  378,  844,  166,    3,   14,  1252, 54,   58, 626,
+            2295, 3995, 2172, 1920,   432, 197, 979,  3076, 29}},
 
           // "How's it going?"
           /*decode_tokens=*/
@@ -1009,10 +1306,10 @@ TEST_F(SessionBasicTest,
   ASSERT_OK_AND_ASSIGN(
       auto executor,
       CreateFakeLlmExecutor(
-          // Expected tokens: "<test>User\nHello World!<end>\n<test>Model\n"
+          // Expected tokens: "</s><test>User\nHello World!<end>\n<test>Model\n"
           /*prefill_tokens=*/{{2,   4,  0,   39,  637, 0,    3328, 8,   179, 90,
-                               547, 58, 735, 210, 466, 2294, 4,    0,   40,  23,
-                               0,   4,  0,   39,  637, 0,    197,  979, 3076}},
+                               547, 58, 735, 210, 466, 2294, 0,    40,  23,  0,
+                               4,   0,  39,  637, 0,   197,  979,  3076}},
           /*decode_tokens=*/{{224}}));
 
   proto::BenchmarkParams benchmark_params;

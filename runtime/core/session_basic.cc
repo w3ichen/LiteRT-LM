@@ -217,8 +217,8 @@ absl::StatusOr<ExecutorAudioData> SessionBasic::CombineExecutorData(
   return CombineExecutorDataImpl(executor_data);
 }
 
-absl::StatusOr<std::string> SessionBasic::ApplyPromptTemplates(
-    absl::string_view input, bool is_first_chunk, bool is_last_chunk) {
+absl::StatusOr<std::vector<InputData>> SessionBasic::ApplyPromptTemplates(
+    const std::vector<InputData>& contents) {
   auto bos_token_id = session_config_.GetStartTokenId();
   std::string bos_string = "";
   // Lookup the BOS string from the tokenizer.
@@ -227,38 +227,107 @@ absl::StatusOr<std::string> SessionBasic::ApplyPromptTemplates(
     ASSIGN_OR_RETURN(bos_string, tokenizer_.TokenIdsToText({bos_token_id}));
   }
 
-  // Check if the input contains the BOS string. If it does, return an error.
-  // This is to prevent the user from including the BOS string in the input.
-  // If the BOS string is empty, it means the BOS token id is not valid. In this
-  // case, we will not check for the BOS string in the input.
-  if (!bos_string.empty() && absl::StrContains(input, bos_string)) {
-    return absl::InvalidArgumentError(
-        "Input contains bos control token. Control token should not be "
-        "included in the input.");
-  }
-
-  std::string turn_prefix = "";
-  if (is_first_chunk) {
-    std::string session_prefix;
-    if (is_first_turn_) {
-      is_first_turn_ = false;
-      // If no legal bos token, the bos string will be empty here which is fine.
-      session_prefix = bos_string;
-    } else {
-      session_prefix = "\n";
+  std::vector<InputData> templated_contents;
+  for (int i = 0; i < contents.size(); ++i) {
+    const auto& content = contents[i];
+    const bool is_first_chunk = i == 0;
+    const bool is_last_chunk = i == contents.size() - 1;
+    absl::string_view raw_text = "";
+    if (const auto* input_text = std::get_if<InputText>(&content);
+        input_text != nullptr && !input_text->IsTensorBuffer()) {
+      ASSIGN_OR_RETURN(raw_text, input_text->GetRawTextString());
     }
-    turn_prefix = absl::StrCat(
-        session_prefix, session_config_.GetPromptTemplates().user().prefix());
-  }
 
-  std::string turn_suffix = "";
-  if (is_last_chunk) {
-    turn_suffix =
+    // Check if the input starts with the BOS string. If it does, return an
+    // error. This is to prevent the user from including the BOS string in the
+    // input. This is also needed for the current implementation as tokenizer
+    // will treat the BOS string differently from other strings. If the BOS
+    // string is empty, it means the BOS token id is not valid. In this case, we
+    // will not check for the BOS string in the input.
+    if (!bos_string.empty() && absl::StartsWith(raw_text, bos_string)) {
+      return absl::InvalidArgumentError(
+          "Input contains bos control token. Control token should not be "
+          "included in the input.");
+    }
+
+    std::string session_prefix = "";
+    if (is_first_chunk) {
+      session_prefix = is_first_turn_ ? bos_string : "\n";
+      if (is_first_turn_) is_first_turn_ = false;
+    }
+    std::string turn_prefix = absl::StrCat(
+        session_prefix, session_config_.GetPromptTemplates().user().prefix());
+    std::string turn_suffix =
         absl::StrCat(session_config_.GetPromptTemplates().user().suffix(),
                      session_config_.GetPromptTemplates().model().prefix());
-  }
 
-  return absl::StrCat(turn_prefix, input, turn_suffix);
+    if (raw_text.empty()) {
+      // Non-text chunk. Add templates as separate InputText objects.
+      if (is_first_chunk) {
+        templated_contents.push_back(InputText(std::move(turn_prefix)));
+      }
+      if (std::holds_alternative<InputText>(content)) {
+        const auto& input_text = std::get_if<InputText>(&content);
+        RET_CHECK(input_text->IsTensorBuffer())
+            << "Raw text is empty means the content should be a TensorBuffer.";
+        ASSIGN_OR_RETURN(auto input_text_tensor_buffer,
+                         input_text->GetPreprocessedTextTensor());
+        LITERT_ASSIGN_OR_RETURN_ABSL(auto input_text_tensor_buffer_clone,
+                                     input_text_tensor_buffer->Duplicate());
+        auto input_text_clone =
+            InputText(std::move(input_text_tensor_buffer_clone));
+        templated_contents.push_back(std::move(input_text_clone));
+      } else if (std::holds_alternative<InputImage>(content)) {
+        const auto& input_image = std::get_if<InputImage>(&content);
+        if (input_image->IsTensorBuffer()) {
+          ASSIGN_OR_RETURN(auto input_image_tensor_buffer,
+                           input_image->GetPreprocessedImageTensor());
+          LITERT_ASSIGN_OR_RETURN_ABSL(auto input_image_tensor_buffer_clone,
+                                       input_image_tensor_buffer->Duplicate());
+          auto input_image_clone =
+              InputImage(std::move(input_image_tensor_buffer_clone));
+          templated_contents.push_back(std::move(input_image_clone));
+        } else {
+          ASSIGN_OR_RETURN(auto input_image_bytes,
+                           input_image->GetRawImageBytes());
+          templated_contents.push_back(
+              InputImage(std::string(input_image_bytes)));
+        }
+      } else if (std::holds_alternative<InputAudio>(content)) {
+        const auto* input_audio = std::get_if<InputAudio>(&content);
+        if (input_audio->IsTensorBuffer()) {
+          ASSIGN_OR_RETURN(auto input_audio_tensor_buffer,
+                           input_audio->GetPreprocessedAudioTensor());
+          LITERT_ASSIGN_OR_RETURN_ABSL(auto input_audio_tensor_buffer_clone,
+                                       input_audio_tensor_buffer->Duplicate());
+          auto input_audio_clone =
+              InputAudio(std::move(input_audio_tensor_buffer_clone));
+          templated_contents.push_back(std::move(input_audio_clone));
+        } else {
+          ASSIGN_OR_RETURN(auto input_audio_bytes,
+                           input_audio->GetRawAudioBytes());
+          templated_contents.push_back(
+              InputAudio(std::string(input_audio_bytes)));
+        }
+      }
+      if (is_last_chunk) {
+        templated_contents.push_back(InputText(std::move(turn_suffix)));
+      }
+    } else {
+      // Raw text chunk. Combine templates with the raw text.
+      std::string templated_text;
+      if (is_first_chunk) {
+        templated_text = absl::StrCat(turn_prefix, raw_text);
+      } else {
+        templated_text = std::string(raw_text);
+      }
+      if (is_last_chunk) {
+        absl::StrAppend(&templated_text, turn_suffix);
+      }
+      templated_contents.push_back(InputText(std::move(templated_text)));
+    }
+  }
+  return templated_contents;
 }
 
 // TODO - b/436674053: Modularize the preprocessing logic into a separate
@@ -379,75 +448,75 @@ absl::StatusOr<InputText> SessionBasic::StringToProcessedInputText(
   return InputText(std::move(ids_buffer));
 }
 
-// TODO(b/436674053): Modulize the preprocessing logic into a separate
-// preprocessor class, please refer to the bug for more details.
 absl::StatusOr<std::vector<InputData>> SessionBasic::PreprocessContents(
     const std::vector<InputData>& contents) {
   std::vector<InputData> preprocessed_contents;
-  if (!(benchmark_info_.has_value() &&
-        benchmark_info_->GetBenchmarkParams().num_prefill_tokens() > 0)) {
-    ASSIGN_OR_RETURN(std::string formatted_first_chunk,
-                     ApplyPromptTemplates("", /*is_first_chunk=*/true,
-                                          /*is_last_chunk=*/false));
-    if (!formatted_first_chunk.empty()) {
-      ASSIGN_OR_RETURN(auto first_chunk_input_text,
-                       StringToProcessedInputText(formatted_first_chunk));
-      preprocessed_contents.push_back(std::move(first_chunk_input_text));
-    }
-  }
   for (int i = 0; i < contents.size(); ++i) {
-    const auto& input = contents[i];
-    if (const auto* input_text = std::get_if<InputText>(&input)) {
+    const auto& content = contents[i];
+    if (const auto* input_text = std::get_if<InputText>(&content)) {
       if (input_text->IsTensorBuffer()) {
-        ASSIGN_OR_RETURN(const auto* token_ids,
+        ASSIGN_OR_RETURN(auto input_text_tensor_buffer,
                          input_text->GetPreprocessedTextTensor());
-        LITERT_ASSIGN_OR_RETURN_ABSL(auto token_ids_clone,
-                                     token_ids->Duplicate());
-        preprocessed_contents.emplace_back(
-            InputText(std::move(token_ids_clone)));
+        LITERT_ASSIGN_OR_RETURN_ABSL(auto input_text_tensor_buffer_clone,
+                                     input_text_tensor_buffer->Duplicate());
+        auto input_text_clone =
+            InputText(std::move(input_text_tensor_buffer_clone));
+        preprocessed_contents.emplace_back(std::move(input_text_clone));
       } else {
-        ASSIGN_OR_RETURN(auto raw_text, input_text->GetRawTextString());
+        ASSIGN_OR_RETURN(auto templated_text, input_text->GetRawTextString());
         ASSIGN_OR_RETURN(auto processed_input_text,
-                         StringToProcessedInputText(raw_text));
+                         StringToProcessedInputText(templated_text));
         preprocessed_contents.emplace_back(std::move(processed_input_text));
       }
-    } else if (const auto* input_image = std::get_if<InputImage>(&input)) {
-      RET_CHECK(image_preprocessor_) << "Image preprocessor is not available.";
+    } else if (const auto* input_image = std::get_if<InputImage>(&content)) {
+      if (input_image->IsTensorBuffer()) {
+        ASSIGN_OR_RETURN(auto input_image_tensor_buffer,
+                         input_image->GetPreprocessedImageTensor());
+        LITERT_ASSIGN_OR_RETURN_ABSL(auto input_image_tensor_buffer_clone,
+                                     input_image_tensor_buffer->Duplicate());
+        auto input_image_clone =
+            InputImage(std::move(input_image_tensor_buffer_clone));
+        preprocessed_contents.emplace_back(std::move(input_image_clone));
+      } else {
+        RET_CHECK(image_preprocessor_)
+            << "Image preprocessor is not available.";
 
-      ASSIGN_OR_RETURN(const auto& target_dims_vector,
-                       vision_executor_->GetExpectedInputDimension());
+        ASSIGN_OR_RETURN(const auto& target_dims_vector,
+                         vision_executor_->GetExpectedInputDimension());
 
-      Dimensions target_dims(target_dims_vector.begin(),
-                             target_dims_vector.end());
+        Dimensions target_dims(target_dims_vector.begin(),
+                               target_dims_vector.end());
 
-      ImagePreprocessParameter input_preprocess_parameters;
-      input_preprocess_parameters.SetTargetDimensions(target_dims);
+        ImagePreprocessParameter input_preprocess_parameters;
+        input_preprocess_parameters.SetTargetDimensions(target_dims);
 
-      ASSIGN_OR_RETURN(auto preprocessed_image,
-                       image_preprocessor_->Preprocess(
-                           *input_image, input_preprocess_parameters));
+        ASSIGN_OR_RETURN(auto preprocessed_image,
+                         image_preprocessor_->Preprocess(
+                             *input_image, input_preprocess_parameters));
 
-      preprocessed_contents.emplace_back(
-          InputImage(std::move(preprocessed_image)));
-    } else if (const auto* input_audio = std::get_if<InputAudio>(&input)) {
-      if (audio_preprocessor_ == nullptr) {
-        return absl::InternalError("Audio preprocessor is not available.");
+        preprocessed_contents.emplace_back(
+            InputImage(std::move(preprocessed_image)));
       }
-      ASSIGN_OR_RETURN(auto preprocessed_audio,
-                       audio_preprocessor_->Preprocess(*input_audio));
-      preprocessed_contents.emplace_back(
-          InputAudio(std::move(preprocessed_audio)));
-    }
-  }
-  if (!(benchmark_info_.has_value() &&
-        benchmark_info_->GetBenchmarkParams().num_prefill_tokens() > 0)) {
-    ASSIGN_OR_RETURN(std::string formatted_last_chunk,
-                     ApplyPromptTemplates("", /*is_first_chunk=*/false,
-                                          /*is_last_chunk=*/true));
-    if (!formatted_last_chunk.empty()) {
-      ASSIGN_OR_RETURN(auto last_chunk_input_text,
-                       StringToProcessedInputText(formatted_last_chunk));
-      preprocessed_contents.push_back(std::move(last_chunk_input_text));
+    } else if (const auto* input_audio = std::get_if<InputAudio>(&content)) {
+      if (input_audio->IsTensorBuffer()) {
+        ASSIGN_OR_RETURN(auto input_audio_tensor_buffer,
+                         input_audio->GetPreprocessedAudioTensor());
+        LITERT_ASSIGN_OR_RETURN_ABSL(auto input_audio_tensor_buffer_clone,
+                                     input_audio_tensor_buffer->Duplicate());
+        auto input_audio_clone =
+            InputAudio(std::move(input_audio_tensor_buffer_clone));
+        preprocessed_contents.emplace_back(std::move(input_audio_clone));
+      } else {
+        if (audio_preprocessor_ == nullptr) {
+          return absl::InternalError("Audio preprocessor is not available.");
+        }
+        RET_CHECK(audio_preprocessor_)
+            << "Audio preprocessor is not available.";
+        ASSIGN_OR_RETURN(auto preprocessed_audio,
+                         audio_preprocessor_->Preprocess(*input_audio));
+        preprocessed_contents.emplace_back(
+            InputAudio(std::move(preprocessed_audio)));
+      }
     }
   }
   return preprocessed_contents;
@@ -478,8 +547,16 @@ absl::Status SessionBasic::RunPrefill(const std::vector<InputData>& contents) {
   if (benchmark_info_.has_value()) {
     RETURN_IF_ERROR(benchmark_info_->TimePrefillTurnStart());
   }
-  ASSIGN_OR_RETURN(std::vector<InputData> preprocessed_contents,
-                   PreprocessContents(contents));
+  std::vector<InputData> preprocessed_contents;
+  if (benchmark_info_.has_value() &&
+      benchmark_info_->GetBenchmarkParams().num_prefill_tokens() > 0) {
+    ASSIGN_OR_RETURN(preprocessed_contents, PreprocessContents(contents));
+  } else {
+    ASSIGN_OR_RETURN(std::vector<InputData> templated_contents,
+                     ApplyPromptTemplates(contents));
+    ASSIGN_OR_RETURN(preprocessed_contents,
+                     PreprocessContents(templated_contents));
+  }
   absl::Status status;
   RETURN_IF_ERROR(worker_thread_pool_.Schedule(
       [this, preprocessed_contents = std::move(preprocessed_contents),
@@ -503,8 +580,16 @@ absl::Status SessionBasic::RunPrefillAsync(
   if (benchmark_info_.has_value()) {
     RETURN_IF_ERROR(benchmark_info_->TimePrefillTurnStart());
   }
-  ASSIGN_OR_RETURN(std::vector<InputData> preprocessed_contents,
-                   PreprocessContents(contents));
+  std::vector<InputData> preprocessed_contents;
+  if (benchmark_info_.has_value() &&
+      benchmark_info_->GetBenchmarkParams().num_prefill_tokens() > 0) {
+    ASSIGN_OR_RETURN(preprocessed_contents, PreprocessContents(contents));
+  } else {
+    ASSIGN_OR_RETURN(std::vector<InputData> templated_contents,
+                     ApplyPromptTemplates(contents));
+    ASSIGN_OR_RETURN(preprocessed_contents,
+                     PreprocessContents(templated_contents));
+  }
   RETURN_IF_ERROR(worker_thread_pool_.Schedule(
       [this, preprocessed_contents = std::move(preprocessed_contents),
        observer]() {

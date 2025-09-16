@@ -94,9 +94,14 @@ class SessionBasic : public Engine::Session {
   // TODO - b/436674053: This is a temporary solution to add required templates
   // to the input. Should be removed once the prompt templates are properly
   // handled via the conversation layer.
-  absl::StatusOr<std::string> ApplyPromptTemplates(absl::string_view input,
-                                                   bool is_first_chunk,
-                                                   bool is_last_chunk);
+  absl::StatusOr<std::vector<InputData>> ApplyPromptTemplates(
+      const std::vector<InputData>& contents);
+
+  // Preprocesses the input contents. This function is used for pre-processing
+  // the input contents before sending them to the LLM executor.
+  // Text input will be preprocessed by the tokenizer.
+  absl::StatusOr<std::vector<InputData>> PreprocessContents(
+      const std::vector<InputData>& contents);
 
   // Util function for creating the combined ExecutorInputs from the
   // preprocessed contents.
@@ -166,12 +171,6 @@ class SessionBasic : public Engine::Session {
         benchmark_info_(benchmark_info),
         worker_thread_pool_(*worker_thread_pool),
         stop_token_detector_(stop_token_detector) {}
-
-  // Preprocesses the input contents. This function is used for pre-processing
-  // the input contents before sending them to the LLM executor.
-  // Text input will be preprocessed by the tokenizer.
-  absl::StatusOr<std::vector<InputData>> PreprocessContents(
-      const std::vector<InputData>& contents);
 
   // The internal function to prefill the input prompt. It is for convenience to
   // wrap it with lambda function for scheduling.
