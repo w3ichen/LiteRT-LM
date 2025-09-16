@@ -253,6 +253,7 @@ absl::Status LlmLiteRtCompiledModelExecutor::Prefill(
 
 absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
     absl::string_view prefill_signature, Span<const int> ids) {
+
   {
     // Fill the input buffers with scoped locks.
     auto& prefill_input_pos =
@@ -378,6 +379,7 @@ absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
 
 absl::Status LlmLiteRtCompiledModelExecutor::Decode(
     ::litert::TensorBuffer& output_tokens) {
+
   ASSIGN_OR_RETURN(decoded_logits_, DecodeLogits(ExecutorInputs()));
   LITERT_ASSIGN_OR_RETURN_ABSL(auto size, decoded_logits_.PackedSize());
   if (decoded_logits_vector_.empty()) {
@@ -411,6 +413,7 @@ absl::Status LlmLiteRtCompiledModelExecutor::Decode(
 
 absl::Status LlmLiteRtCompiledModelExecutor::Decode(
     const ExecutorInputs& inputs, ::litert::TensorBuffer& output_logits) {
+
   int id = next_input_token_id_;
 
   if (inputs.GetTextDataPtr().ok()) {
