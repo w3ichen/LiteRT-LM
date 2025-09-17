@@ -427,9 +427,9 @@ absl::StatusOr<std::vector<InputData>> SessionBasic::PreprocessContents(
         ASSIGN_OR_RETURN(auto input_image_copy, input_image->CreateCopy());
         preprocessed_contents.emplace_back(std::move(input_image_copy));
       } else {
-        RET_CHECK(image_preprocessor_)
-            << "Image preprocessor is not available.";
-
+        if (image_preprocessor_ == nullptr) {
+          return absl::InternalError("Image preprocessor is not available.");
+        }
         ASSIGN_OR_RETURN(const auto& target_dims_vector,
                          vision_executor_->GetExpectedInputDimension());
 
@@ -454,8 +454,6 @@ absl::StatusOr<std::vector<InputData>> SessionBasic::PreprocessContents(
         if (audio_preprocessor_ == nullptr) {
           return absl::InternalError("Audio preprocessor is not available.");
         }
-        RET_CHECK(audio_preprocessor_)
-            << "Audio preprocessor is not available.";
         ASSIGN_OR_RETURN(auto preprocessed_audio,
                          audio_preprocessor_->Preprocess(*input_audio));
         preprocessed_contents.emplace_back(
