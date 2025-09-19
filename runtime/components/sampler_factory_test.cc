@@ -15,31 +15,15 @@
 #include "runtime/components/sampler_factory.h"
 
 #include <memory>
-#include <optional>
-#include <string>
-#include <tuple>
 #include <utility>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
-#include "absl/strings/string_view.h"  // from @com_google_absl
-#include "absl/types/span.h"  // from @com_google_absl
-#include "litert/c/litert_common.h"  // from @litert
-#include "litert/cc/litert_compiled_model.h"  // from @litert
-#include "litert/cc/litert_environment.h"  // from @litert
-#include "litert/cc/litert_expected.h"  // from @litert
-#include "litert/cc/litert_options.h"  // from @litert
-#include "litert/cc/options/litert_gpu_options.h"  // from @litert
-#include "runtime/components/model_resources.h"
-#include "runtime/components/model_resources_task.h"
 #include "runtime/components/top_p_cpu_sampler.h"
 #include "runtime/executor/executor_settings_base.h"
 #include "runtime/proto/sampler_params.pb.h"
-#include "runtime/util/litert_status_util.h"
-#include "runtime/util/model_asset_bundle_resources.h"
-#include "runtime/util/scoped_file.h"
 #include "runtime/util/test_utils.h"  // IWYU pragma: keep
 
 namespace litert::lm {

@@ -397,8 +397,6 @@ cc_test(
             "@litert//litert/cc:litert_options",
             "@litert//litert/cc/options:litert_gpu_options",
         ],
-    }) + select({
-        "//conditions:default": [],
     }),
 )
 
