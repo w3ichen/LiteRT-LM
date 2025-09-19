@@ -102,6 +102,7 @@ absl::StatusOr<std::string> GetRawAudioData() {
 
 class FrontendModelWrapper {
  public:
+  static constexpr int kInputTensorLength = 523426;
   static absl::StatusOr<std::unique_ptr<FrontendModelWrapper>> Create(
       absl::string_view model_path) {
     LITERT_ASSIGN_OR_RETURN(auto env, litert::Environment::Create({}));
@@ -129,14 +130,22 @@ class FrontendModelWrapper {
       return absl::FailedPreconditionError("Model not initialized.");
     }
 
-    std::vector<uint8_t> mask_data(audio_data.size(), 1);
-
+    // Data in memory needs to be continuous, but the bool type of std library
+    // vector is not guaranteed to be continuous for memory. So here we use a
+    // bool* to create a continuous memory buffer. This prevent the UBSan check
+    // error. See go/ubsan.
+    bool* mask_data_ptr = new bool[kInputTensorLength];
+    for (int i = 0; i < kInputTensorLength; ++i) {
+      if (i < audio_data.size()) {
+        mask_data_ptr[i] = true;
+      } else {
+        mask_data_ptr[i] = false;
+      }
+    }
     LITERT_RETURN_IF_ERROR(input_buffers_[0].Write(
-        absl::MakeSpan(reinterpret_cast<const uint8_t*>(mask_data.data()),
-                       mask_data.size() * sizeof(uint8_t))));
-    LITERT_RETURN_IF_ERROR(input_buffers_[1].Write(
-        absl::MakeSpan(reinterpret_cast<const uint8_t*>(audio_data.data()),
-                       audio_data.size() * sizeof(float))));
+        absl::MakeConstSpan(mask_data_ptr, kInputTensorLength)));
+    delete[] mask_data_ptr;
+    LITERT_RETURN_IF_ERROR(input_buffers_[1].Write(absl::MakeSpan(audio_data)));
 
     compiled_model_.Run(input_buffers_, output_buffers_);
     LITERT_ASSIGN_OR_RETURN(*output_mask,
