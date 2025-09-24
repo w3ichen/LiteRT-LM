@@ -47,19 +47,25 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
   // Holds the latency breakdown stats for the executor.
   // TODO(b/405424188): Use 'litert::lm::BenchmarkInfo' instead.
   struct LatencyStats {
+    // Prefill latency stats.
     uint64_t prefill_e2e_latency_us = 0;
     int prefill_num_tokens = 0;
     uint64_t prefill_prepare_input_latency_us = 0;
     uint64_t prefill_embedder_inference_latency_us = 0;
+    std::optional<uint64_t> prefill_embedder_per_layer_inference_latency_us =
+        std::nullopt;
     uint64_t prefill_mask_inference_latency_us = 0;
     uint64_t prefill_rope_inference_latency_us = 0;
     uint64_t prefill_llm_inference_latency_us = 0;
     uint64_t prefill_cache_update_inference_latency_us = 0;
 
+    // Decode latency stats.
     uint64_t decode_e2e_latency_us = 0;
     int decode_num_tokens = 0;
     uint64_t decode_prepare_input_latency_us = 0;
     uint64_t decode_embedder_inference_latency_us = 0;
+    std::optional<uint64_t> decode_embedder_per_layer_inference_latency_us =
+        std::nullopt;
     uint64_t decode_mask_inference_latency_us = 0;
     uint64_t decode_rope_inference_latency_us = 0;
     uint64_t decode_llm_inference_latency_us = 0;
@@ -69,9 +75,10 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
 
   // Creates an executor from the resources.
   static absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
-  Create(
-      const LlmExecutorSettings& executor_settings, ModelResources& resources,
-      const std::optional<std::string>& dispatch_library_path = std::nullopt);
+  Create(const LlmExecutorSettings& executor_settings,
+         ModelResources& resources,
+         const std::optional<std::string>& dispatch_library_path = std::nullopt,
+         bool is_benchmark_enabled = false);
 
   // Input APIs:
   // Basic API to trigger the "prefill" or "prefix" process.
@@ -189,7 +196,8 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
       SortedPrefillSignatureMap prefill_signature_map,
       std::optional<std::unique_ptr<EmbeddingLookupManager>>
           embedding_lookup_manager,
-      std::optional<EmbedderPerLayerContext> embedder_per_layer_context)
+      std::optional<EmbedderPerLayerContext> embedder_per_layer_context,
+      bool is_benchmark_enabled)
       : executor_settings_(std::move(executor_settings)),
         embedder_context_(std::move(embedder_context)),
         npu_auxiliary_context_(std::move(npu_auxiliary_context)),
@@ -202,7 +210,13 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
         llm_inference_context_(std::move(llm_inference_context)),
         cache_update_inference_context_(
             std::move(cache_update_inference_context)),
-        prefill_signature_map_(std::move(prefill_signature_map)) {}
+        prefill_signature_map_(std::move(prefill_signature_map)),
+        is_benchmark_enabled_(is_benchmark_enabled) {
+    if (embedder_per_layer_context_.has_value()) {
+      latency_stats_.prefill_embedder_per_layer_inference_latency_us = 0;
+      latency_stats_.decode_embedder_per_layer_inference_latency_us = 0;
+    }
+  }
 
  private:
   // Prefill internal implementation, for one prefill call to the Interpreter
@@ -334,13 +348,15 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
   static absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
   CreateForGemma3n(const LlmExecutorSettings& executor_settings,
                    ModelResources& resources, litert::Environment& env,
-                   const litert::Model* transformer_model);
+                   const litert::Model* transformer_model,
+                   bool is_benchmark_enabled);
 
   // Create the executor for Gemma3.
   static absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
   CreateForGemma3(const LlmExecutorSettings& executor_settings,
                   ModelResources& resources, litert::Environment& env,
-                  const litert::Model* transformer_model);
+                  const litert::Model* transformer_model,
+                  bool is_benchmark_enabled);
 
   LlmExecutorSettings executor_settings_;
   std::unique_ptr<ModelResources> resources_;
@@ -370,6 +386,10 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
   // The processed tokens.  This is also used to store the pending input token
   // for next prefill or decode steps.
   litert::lm::ProcessedTokens processed_tokens_;
+
+  // Whether benchmark mode is enabled, this controls whether to print the
+  // latency stats for the executor on reset.
+  const bool is_benchmark_enabled_;
 };
 
 }  // namespace litert::lm

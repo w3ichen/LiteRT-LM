@@ -207,10 +207,11 @@ absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
       return absl::InvalidArgumentError(
           absl::StrCat("Model file not found: ", path.parent_path().string()));
     }
-    ASSIGN_OR_RETURN(executor,
-                     LlmLiteRtNpuCompiledModelExecutor::Create(
-                         engine_settings.GetMainExecutorSettings(),
-                         *model_resources, path.parent_path().string()));
+    ASSIGN_OR_RETURN(
+        executor,
+        LlmLiteRtNpuCompiledModelExecutor::Create(
+            engine_settings.GetMainExecutorSettings(), *model_resources,
+            path.parent_path().string(), benchmark_info.has_value()));
   }
 
   // TODO - b/436674053: Modularize the executor creation logic into a

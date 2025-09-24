@@ -16,10 +16,12 @@
 
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -179,6 +181,168 @@ litert::Expected<bool> HasPerLayerEmbedder(
     }
   }
   return false;
+}
+
+float GetToksPrefill(
+    const LlmLiteRtNpuCompiledModelExecutor::LatencyStats& latency_stats) {
+  return ((latency_stats.prefill_num_tokens * 1000 * 1000) /
+          (float)latency_stats.prefill_e2e_latency_us);
+}
+
+float GetToksDecode(
+    const LlmLiteRtNpuCompiledModelExecutor::LatencyStats& latency_stats) {
+  return ((latency_stats.decode_num_tokens * 1000 * 1000) /
+          (float)latency_stats.decode_e2e_latency_us);
+}
+
+void PrintLatencyStats(
+    const LlmLiteRtNpuCompiledModelExecutor::LatencyStats& latency_stats) {
+  std::ostringstream formatted_stats;
+  formatted_stats << "\n" << "====== PREFILL STATS ======";
+  formatted_stats << "\n"
+                  << "Total prefill latency [us]: "
+                  << latency_stats.prefill_e2e_latency_us;
+  formatted_stats << "\n"
+                  << "(e2e) Prefill num tokens: "
+                  << latency_stats.prefill_num_tokens;
+  formatted_stats << "\n"
+                  << "(e2e) Prefill tokens per second: "
+                  << GetToksPrefill(latency_stats);
+  formatted_stats << "\n"
+                  << "(TransformerStackOnly) Prefill tokens per second: "
+                  << ((latency_stats.prefill_num_tokens * 1000 * 1000) /
+                      (float)latency_stats.prefill_llm_inference_latency_us);
+
+  formatted_stats << "\n" << "------ Prefill breakdown ------";
+  formatted_stats << "\n"
+                  << "Total prefill prepare input tensors latency [us]: "
+                  << latency_stats.prefill_prepare_input_latency_us << " ("
+                  << ((latency_stats.prefill_prepare_input_latency_us * 100) /
+                      (float)latency_stats.prefill_e2e_latency_us)
+                  << "%)";
+  formatted_stats << "\n"
+                  << "Total prefill embedder inference latency [us]: "
+                  << latency_stats.prefill_embedder_inference_latency_us << " ("
+                  << ((latency_stats.prefill_embedder_inference_latency_us *
+                       100) /
+                      (float)latency_stats.prefill_e2e_latency_us)
+                  << "%)";
+  if (latency_stats.prefill_embedder_per_layer_inference_latency_us
+          .has_value()) {
+    formatted_stats
+        << "\n"
+        << "Total prefill embedder per layer inference latency [us]: "
+        << latency_stats.prefill_embedder_per_layer_inference_latency_us.value()
+        << " ("
+        << ((latency_stats.prefill_embedder_per_layer_inference_latency_us
+                 .value() *
+             100) /
+            (float)latency_stats.prefill_e2e_latency_us)
+        << "%)";
+  }
+  formatted_stats << "\n"
+                  << "Total prefill rope inference latency [us]: "
+                  << latency_stats.prefill_rope_inference_latency_us << " ("
+                  << ((latency_stats.prefill_rope_inference_latency_us * 100) /
+                      (float)latency_stats.prefill_e2e_latency_us)
+                  << "%)";
+  formatted_stats << "\n"
+                  << "Total prefill mask inference latency [us]: "
+                  << latency_stats.prefill_mask_inference_latency_us << " ("
+                  << ((latency_stats.prefill_mask_inference_latency_us * 100) /
+                      (float)latency_stats.prefill_e2e_latency_us)
+                  << "%)";
+  formatted_stats << "\n"
+                  << "Total prefill LLM inference latency [us]: "
+                  << latency_stats.prefill_llm_inference_latency_us << " ("
+                  << ((latency_stats.prefill_llm_inference_latency_us * 100) /
+                      (float)latency_stats.prefill_e2e_latency_us)
+                  << "%)";
+  formatted_stats << "\n"
+                  << "Total prefill cache update inference latency [us]: "
+                  << latency_stats.prefill_cache_update_inference_latency_us
+                  << " ("
+                  << ((latency_stats.prefill_cache_update_inference_latency_us *
+                       100) /
+                      (float)latency_stats.prefill_e2e_latency_us)
+                  << "%)";
+
+  formatted_stats << "\n" << "\n====== DECODE STATS ======";
+  formatted_stats << "\n"
+                  << "Total decode latency [us]: "
+                  << latency_stats.decode_e2e_latency_us;
+  formatted_stats << "\n"
+                  << "Decode num tokens: " << latency_stats.decode_num_tokens;
+  formatted_stats << "\n"
+                  << "Decode tokens per second: "
+                  << GetToksDecode(latency_stats);
+  formatted_stats << "\n"
+                  << "(TransformerStackOnly) Decode tokens per second: "
+                  << ((latency_stats.decode_num_tokens * 1000 * 1000) /
+                      (float)latency_stats.decode_llm_inference_latency_us);
+
+  formatted_stats << "\n" << "------ Decode breakdown ------";
+  formatted_stats << "\n"
+                  << "Total decode prepare input tensors latency [us]: "
+                  << latency_stats.decode_prepare_input_latency_us << " ("
+                  << ((latency_stats.decode_prepare_input_latency_us * 100) /
+                      (float)latency_stats.decode_e2e_latency_us)
+                  << "%)";
+  formatted_stats << "\n"
+                  << "Total decode embedder inference latency [us]: "
+                  << latency_stats.decode_embedder_inference_latency_us << " ("
+                  << ((latency_stats.decode_embedder_inference_latency_us *
+                       100) /
+                      (float)latency_stats.decode_e2e_latency_us)
+                  << "%)";
+  if (latency_stats.decode_embedder_per_layer_inference_latency_us
+          .has_value()) {
+    formatted_stats
+        << "\n"
+        << "Total decode embedder per layer inference latency [us]: "
+        << latency_stats.decode_embedder_per_layer_inference_latency_us.value()
+        << " ("
+        << ((latency_stats.decode_embedder_per_layer_inference_latency_us
+                 .value() *
+             100) /
+            (float)latency_stats.decode_e2e_latency_us)
+        << "%)";
+  }
+  formatted_stats << "\n"
+                  << "Total decode rope inference latency [us]: "
+                  << latency_stats.decode_rope_inference_latency_us << " ("
+                  << ((latency_stats.decode_rope_inference_latency_us * 100) /
+                      (float)latency_stats.decode_e2e_latency_us)
+                  << "%)";
+  formatted_stats << "\n"
+                  << "Total decode mask inference latency [us]: "
+                  << latency_stats.decode_mask_inference_latency_us << " ("
+                  << ((latency_stats.decode_mask_inference_latency_us * 100) /
+                      (float)latency_stats.decode_e2e_latency_us)
+                  << "%)";
+  formatted_stats << "\n"
+                  << "Total decode LLM inference latency [us]: "
+                  << latency_stats.decode_llm_inference_latency_us << " ("
+                  << ((latency_stats.decode_llm_inference_latency_us * 100) /
+                      (float)latency_stats.decode_e2e_latency_us)
+                  << "%)";
+  formatted_stats << "\n"
+                  << "Total decode cache update inference latency [us]: "
+                  << latency_stats.decode_cache_update_inference_latency_us
+                  << " ("
+                  << ((latency_stats.decode_cache_update_inference_latency_us *
+                       100) /
+                      (float)latency_stats.decode_e2e_latency_us)
+                  << "%)";
+  formatted_stats << "\n"
+                  << "Total decode sampling latency [us]: "
+                  << latency_stats.decode_sampling_latency_us << " ("
+                  << ((latency_stats.decode_sampling_latency_us * 100) /
+                      (float)latency_stats.decode_e2e_latency_us)
+                  << "%)\n";
+
+  ABSL_LOG(INFO) << "Custom NPU execution latency stats:\n"
+                 << formatted_stats.str();
 }
 
 }  // namespace
@@ -845,7 +1009,12 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
     }
     processed_tokens_.AddProcessedTokens(processed_input_tokens);
 
+    auto end_prepare_inputs = absl::Now();
+    latency_stats_.prefill_prepare_input_latency_us +=
+        absl::ToInt64Microseconds(end_prepare_inputs - start_prepare_inputs);
+
     if (UseEmbeddingLookupManager()) {
+      auto start = absl::Now();
       // We use the embedding lookup manager to populate the embedding buffer.
       // If we already placed a pending input token into the embedding buffer
       // before, we'll flag that as an offset to the embedding lookup manager.
@@ -855,6 +1024,8 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
       RETURN_IF_ERROR(embedding_lookup_manager_.value()->LookupPrefill(
           processed_input_tokens, &embedding_buffer,
           pending_input_token != nullptr ? 1 : 0));
+      latency_stats_.prefill_embedder_inference_latency_us +=
+          absl::ToInt64Microseconds(absl::Now() - start);
     }
   }
 
@@ -864,21 +1035,20 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
       std::make_shared<TokenData>(ids.back());
 
   if (UseEmbeddingLookupManager()) {
+    auto start = absl::Now();
     // Look up the embeddings for the last token so they can be used in the next
     // prefill or decode. This has to be done now in the case of multi-modal
     // prefill so the embeddings are used in the correct order.
     RETURN_IF_ERROR(embedding_lookup_manager_.value()->LookupPrefill(
         last_input_token->id(), last_input_token->mutable_embedding()));
+    latency_stats_.prefill_embedder_inference_latency_us +=
+        absl::ToInt64Microseconds(absl::Now() - start);
   }
 
   // Add the last input token to the pending input token list.
   RETURN_IF_ERROR(
       processed_tokens_.AddPendingInputToken(std::move(last_input_token)));
   ++current_step_;
-
-  auto end_prepare_inputs = absl::Now();
-  latency_stats_.prefill_prepare_input_latency_us +=
-      absl::ToInt64Microseconds(end_prepare_inputs - start_prepare_inputs);
 
   if (!UseEmbeddingLookupManager()) {
     // Invoke embedder signature for Gemma3, because we don't have the
@@ -896,6 +1066,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
 
   // Invoke embedder per layer signature if it exists.
   if (embedder_per_layer_context_.has_value()) {
+    auto start = absl::Now();
     auto res =
         embedder_per_layer_context_->embedder_per_layer_compiled_model.Run(
             EmbedderPerLayerSignatures::kPrefillEmbedderPerLayer,
@@ -905,6 +1076,8 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
                 .prefill_output_buffers);
     RET_CHECK(res) << "Failed to run embedder per layer model."
                    << res.Error().Message();
+    latency_stats_.prefill_embedder_per_layer_inference_latency_us.value() +=
+        absl::ToInt64Microseconds(absl::Now() - start);
   }
 
   // Invoke RoPE signature.
@@ -1026,6 +1199,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::DecodeInternal(
   if (UseEmbeddingLookupManager()) {
     // We'll write any pending embedding directly into the transformer
     // embedding buffer.
+    auto start = absl::Now();
     LITERT_ASSIGN_OR_RETURN(
         auto transformer_embedding_buffer_lock_and_addr,
         ::litert::TensorBufferScopedLock::Create(
@@ -1036,10 +1210,13 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::DecodeInternal(
         static_cast<float*>(transformer_embedding_buffer_lock_and_addr.second);
     memcpy(transformer_embedding_buffer_ptr, token->embedding().data(),
            token->embedding().size() * sizeof(float));
+    latency_stats_.decode_embedder_inference_latency_us +=
+        absl::ToInt64Microseconds(absl::Now() - start);
   }
 
   {
     if (embedder_per_layer_context_.has_value()) {
+      auto start = absl::Now();
       auto res =
           embedder_per_layer_context_->embedder_per_layer_compiled_model.Run(
               EmbedderPerLayerSignatures::kDecodeEmbedderPerLayer,
@@ -1049,6 +1226,8 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::DecodeInternal(
                   .decode_output_buffers);
       RET_CHECK(res) << "Failed to run embedder per layer model."
                      << res.Error().Message();
+      latency_stats_.decode_embedder_per_layer_inference_latency_us.value() +=
+          absl::ToInt64Microseconds(absl::Now() - start);
     }
   }
 
@@ -1119,6 +1298,9 @@ LlmLiteRtNpuCompiledModelExecutor::GetLatencyStats() const {
 }
 
 absl::Status LlmLiteRtNpuCompiledModelExecutor::Reset() {
+  if (is_benchmark_enabled_) {
+    PrintLatencyStats(GetLatencyStats());
+  }
   current_step_ = 0;
   RETURN_IF_ERROR(processed_tokens_.RollBackToStep(0));
   sampled_ids_.clear();
@@ -1130,7 +1312,8 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::Reset() {
 absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
 LlmLiteRtNpuCompiledModelExecutor::Create(
     const LlmExecutorSettings& executor_settings, ModelResources& resources,
-    const std::optional<std::string>& dispatch_library_path) {
+    const std::optional<std::string>& dispatch_library_path,
+    bool is_benchmark_enabled) {
   std::vector<::litert::Environment::Option> environment_options = {};
   if (dispatch_library_path.has_value()) {
     ABSL_LOG(INFO) << "Setting dispatch library path: "
@@ -1153,9 +1336,11 @@ LlmLiteRtNpuCompiledModelExecutor::Create(
                           HasPerLayerEmbedder(*llm_model));
   const bool IsGemma3n = has_per_layer_embeddings;
   if (IsGemma3n) {
-    return CreateForGemma3n(executor_settings, resources, env, llm_model);
+    return CreateForGemma3n(executor_settings, resources, env, llm_model,
+                            is_benchmark_enabled);
   } else {
-    return CreateForGemma3(executor_settings, resources, env, llm_model);
+    return CreateForGemma3(executor_settings, resources, env, llm_model,
+                           is_benchmark_enabled);
   }
 };
 
@@ -1174,7 +1359,8 @@ litert::Expected<litert::Options> CreateLiteRtOptions() {
 absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
 LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3n(
     const LlmExecutorSettings& executor_settings, ModelResources& resources,
-    litert::Environment& env, const litert::Model* transformer_model) {
+    litert::Environment& env, const litert::Model* transformer_model,
+    bool is_benchmark_enabled) {
   // If the model is fully AOT compiled for NPU, NPU accelerator is used
   // automatically.
   // Set up LiteRt options.
@@ -1311,14 +1497,15 @@ LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3n(
       std::move(llm_inference_context),
       std::move(cache_update_inference_context), std::move(prefill_runner_set),
       std::move(embedding_lookup_manager),
-      std::move(embedder_per_layer_context)));
+      std::move(embedder_per_layer_context), is_benchmark_enabled));
   return executor;
 }
 
 absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
 LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3(
     const LlmExecutorSettings& executor_settings, ModelResources& resources,
-    litert::Environment& env, const litert::Model* transformer_model) {
+    litert::Environment& env, const litert::Model* transformer_model,
+    bool is_benchmark_enabled) {
   // If the model is fully AOT compiled for NPU, NPU accelerator is used
   // automatically.
   LITERT_ASSIGN_OR_RETURN(auto options, CreateLiteRtOptions());
@@ -1444,7 +1631,7 @@ LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3(
       std::move(llm_inference_context),
       std::move(cache_update_inference_context), std::move(prefill_runner_set),
       /*embedding_lookup_manager=*/std::nullopt,
-      /*embedder_per_layer_context=*/std::nullopt));
+      /*embedder_per_layer_context=*/std::nullopt, is_benchmark_enabled));
   return executor;
 }
 
