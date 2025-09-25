@@ -64,6 +64,14 @@ tool_name(x=1)
                 /*tool_calls =*/"tool_name(x=1)"));
 }
 
+TEST(ParserUtilsTest, ExtractPartialToolCodeAsText) {
+  EXPECT_THAT(
+      ExtractTextAndToolCallStrings("```tool_code\ntool_name(x=1)",
+                                    /*code_fence_start=*/"```tool_code\n",
+                                    /*code_fence_end=*/"\n```"),
+      FieldsAre(/*text=*/"```tool_code\ntool_name(x=1)", /*tool_calls =*/""));
+}
+
 TEST(ParserUtilsTest, ParsePythonToolCall) {
   EXPECT_THAT(ParseTextAndToolCalls(R"(```tool_code
 tool_name(x=1)

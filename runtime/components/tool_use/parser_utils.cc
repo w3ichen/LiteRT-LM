@@ -14,13 +14,11 @@
 
 #include "runtime/components/tool_use/parser_utils.h"
 
-#include <cstddef>
 #include <string>
 #include <vector>
 
 #include "absl/base/no_destructor.h"  // from @com_google_absl
 #include "absl/container/flat_hash_map.h"  // from @com_google_absl
-#include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/str_cat.h"  // from @com_google_absl
@@ -93,22 +91,8 @@ TextAndToolCallStrings ExtractTextAndToolCallStrings(
     result.text = text_before;
     result.tool_calls = code_block;
   } else {
-    // Did not find the full pattern (start_fence ... end_fence).
-    // Check if the start fence exists at all.
-    size_t start_pos = response_str.find(code_fence_start);
-    if (start_pos != absl::string_view::npos) {
-      // Found start fence but no end fence (or regex failed for other reasons).
-      // Mimic the original behavior: text is before start, tool_calls is
-      // after start.
-      ABSL_LOG(WARNING)
-          << "Code fence start found, but end fence pattern did not match.";
-      result.text = response_str.substr(0, start_pos);
-      result.tool_calls =
-          response_str.substr(start_pos + code_fence_start.length());
-    } else {
-      // No start fence found at all. Treat the entire string as text.
-      result.text = response_str;
-    }
+    // If both code fences are not found, treat the entire string as text.
+    result.text = response_str;
   }
   return result;
 }

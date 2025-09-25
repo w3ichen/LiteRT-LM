@@ -32,13 +32,47 @@ cc_library(
 )
 
 cc_library(
+    name = "internal_observable_adapter",
+    srcs = ["internal_observable_adapter.cc"],
+    hdrs = ["internal_observable_adapter.h"],
+    deps = [
+        ":io_types",
+        "@com_google_absl//absl/base:nullability",
+        "@com_google_absl//absl/log:absl_log",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "//runtime/conversation/model_data_processor",
+        "//runtime/conversation/model_data_processor:config_registry",
+        "//runtime/engine:io_types",
+    ],
+)
+
+cc_test(
+    name = "internal_observable_adapter_test",
+    srcs = ["internal_observable_adapter_test.cc"],
+    deps = [
+        ":internal_observable_adapter",
+        ":io_types",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings:string_view",
+        "@nlohmann_json//:json",
+        "//runtime/conversation/model_data_processor:config_registry",
+        "//runtime/conversation/model_data_processor:gemma3_data_processor",
+        "//runtime/conversation/model_data_processor:gemma3_data_processor_config",
+        "//runtime/engine:io_types",
+        "//runtime/util:test_utils",
+    ],
+)
+
+cc_library(
     name = "conversation",
     srcs = ["conversation.cc"],
     hdrs = ["conversation.h"],
     deps = [
+        ":internal_observable_adapter",
         ":io_types",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/base:nullability",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/memory",

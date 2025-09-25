@@ -21,6 +21,7 @@
 
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
+#include "absl/strings/string_view.h"  // from @com_google_absl
 #include "nlohmann/json.hpp"  // from @nlohmann_json
 #include "runtime/conversation/io_types.h"
 #include "runtime/conversation/model_data_processor/config_registry.h"
@@ -50,6 +51,12 @@ class ModelDataProcessor {
   // instruction of the prompt.
   virtual absl::StatusOr<nlohmann::ordered_json> FormatTools(
       const nlohmann::ordered_json& tools) = 0;
+
+  // Returns the start of tool call blocks.
+  virtual absl::string_view CodeFenceStart() = 0;
+
+  // Returns the end of tool call blocks.
+  virtual absl::string_view CodeFenceEnd() = 0;
 };
 
 // TypeSafeModelDataProcessor is a ModelDataProcessor that expects a specific

@@ -46,6 +46,7 @@ cc_library(
         ":config_registry",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings:string_view",
         "@nlohmann_json//:json",
         "//runtime/conversation:io_types",
         "//runtime/engine:io_types",

@@ -15,7 +15,6 @@
 #include "runtime/conversation/conversation.h"
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -23,17 +22,16 @@
 #include <variant>
 #include <vector>
 
-#include "absl/base/nullability.h"  // from @com_google_absl
 #include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/memory/memory.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
-#include "absl/strings/match.h"  // from @com_google_absl
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "absl/synchronization/mutex.h"  // from @com_google_absl
 #include "nlohmann/json.hpp"  // from @nlohmann_json
 #include "runtime/components/prompt_template.h"
+#include "runtime/conversation/internal_observable_adapter.h"
 #include "runtime/conversation/io_types.h"
 #include "runtime/conversation/model_data_processor/config_registry.h"
 #include "runtime/conversation/model_data_processor/gemma3_data_processor.h"
@@ -62,83 +60,6 @@ constexpr absl::string_view kDefaultTemplate =
   {%- endif -%}
 {%- endfor -%})tmpl";
 
-// An adapter to convert the internal LLM Executor's InferenceObservable to
-// the user's MessageObservable.
-class InternalObservableAdapter : public InferenceObservable {
- public:
-  using CompleteMessageCallback = std::function<void(const Message& message)>;
-
-  static std::unique_ptr<InternalObservableAdapter> Create(
-      ModelDataProcessor* model_data_processor,
-      MessageObservable* user_observer, DataProcessorArguments processor_args) {
-    return std::unique_ptr<InternalObservableAdapter>(
-        new InternalObservableAdapter(model_data_processor, user_observer,
-                                      processor_args));
-  }
-
-  void SetCompleteMessageCallback(
-      CompleteMessageCallback complete_message_callback) {
-    complete_message_callback_ = complete_message_callback;
-  }
-
-  void OnNext(const Responses& responses) override {
-    const auto& response_text = responses.GetResponseTextAt(0);
-    if (!response_text.ok()) {
-      user_observer_->OnError(response_text.status());
-      return;
-    }
-    accumulated_response_text_.append(*response_text);
-    const auto& message =
-        model_data_processor_->ToMessage(responses, processor_args_);
-    if (!message.ok()) {
-      user_observer_->OnError(message.status());
-      return;
-    }
-    user_observer_->OnMessage(*message);
-  }
-
-  void OnDone() override {
-    Responses responses(1);
-    responses.GetMutableResponseTexts()[0] = accumulated_response_text_;
-    const auto& complete_message =
-        model_data_processor_->ToMessage(responses, processor_args_);
-    if (!complete_message.ok()) {
-      user_observer_->OnError(complete_message.status());
-      return;
-    }
-    user_observer_->OnComplete();
-    if (complete_message_callback_) {
-      complete_message_callback_(*complete_message);
-    }
-    complete_message_callback_ = nullptr;
-  }
-
-  void OnError(const absl::Status& status) override {
-    // TODO: b/435001805 - handle the max kv-cache size reached situation more
-    // robustly.
-    if (absl::StrContainsIgnoreCase(status.message(),
-                                    "Maximum kv-cache size reached")) {
-      ABSL_LOG(INFO) << "Maximum kv-cache size reached.";
-      OnDone();
-      return;
-    }
-    user_observer_->OnError(status);
-  }
-
- private:
-  explicit InternalObservableAdapter(ModelDataProcessor* model_data_processor,
-                                     MessageObservable* user_observer,
-                                     DataProcessorArguments processor_args)
-      : model_data_processor_(model_data_processor),
-        user_observer_(user_observer),
-        processor_args_(processor_args) {}
-
-  ModelDataProcessor* absl_nonnull model_data_processor_;
-  MessageObservable* absl_nonnull user_observer_;
-  CompleteMessageCallback complete_message_callback_;
-  DataProcessorArguments processor_args_;
-  std::string accumulated_response_text_;
-};
 }  // namespace
 
 absl::StatusOr<std::string> Conversation::GetSingleTurnText(

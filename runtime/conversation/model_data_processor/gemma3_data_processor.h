@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "absl/status/statusor.h"  // from @com_google_absl
+#include "absl/strings/string_view.h"  // from @com_google_absl
 #include "nlohmann/json.hpp"  // from @nlohmann_json
 #include "runtime/conversation/io_types.h"
 #include "runtime/conversation/model_data_processor/gemma3_data_processor_config.h"
@@ -45,6 +46,12 @@ class Gemma3DataProcessor
   // Formats tool declarations.
   absl::StatusOr<nlohmann::ordered_json> FormatTools(
       const nlohmann::ordered_json& tools) override;
+
+  // Returns the start of tool call blocks.
+  absl::string_view CodeFenceStart() override;
+
+  // Returns the end of tool call blocks.
+  absl::string_view CodeFenceEnd() override;
 
  private:
   explicit Gemma3DataProcessor(

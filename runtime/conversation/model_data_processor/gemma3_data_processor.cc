@@ -101,4 +101,12 @@ absl::StatusOr<nlohmann::ordered_json> Gemma3DataProcessor::FormatTools(
   return formatted_tools;
 }
 
+absl::string_view Gemma3DataProcessor::CodeFenceStart() {
+  return config_.code_fence_start;
+}
+
+absl::string_view Gemma3DataProcessor::CodeFenceEnd() {
+  return config_.code_fence_end;
+}
+
 }  // namespace litert::lm
