@@ -56,7 +56,7 @@ tool_name(x=1)
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -76,13 +76,13 @@ tool_2(y=2)
                 "tool_calls": [
                   {
                     "name": "tool_1",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   },
                   {
                     "name": "tool_2",
-                    "args": {
+                    "arguments": {
                       "y": 2
                     }
                   }
@@ -109,7 +109,7 @@ tool_name(x=1)
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -131,7 +131,7 @@ print(tool_name(x=1))
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -150,7 +150,7 @@ TEST(ParserUtilsTest, ParseJsonToolCall) {
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -173,13 +173,13 @@ TEST(ParserUtilsTest, ParseJsonParallelCalls) {
                 "tool_calls": [
                   {
                     "name": "tool_1",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   },
                   {
                     "name": "tool_2",
-                    "args": {
+                    "arguments": {
                       "y": 2
                     }
                   }
@@ -206,7 +206,7 @@ TEST(ParserUtilsTest, ParseTextAndJsonToolCalls) {
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -239,7 +239,7 @@ This is some more text.
                 "tool_calls": [
                   {
                     "name": "tool_1",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -274,13 +274,13 @@ tool_2(y=2)
                 "tool_calls": [
                   {
                     "name": "tool_1",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   },
                   {
                     "name": "tool_2",
-                    "args": {
+                    "arguments": {
                       "y": 2
                     }
                   }
@@ -308,13 +308,13 @@ tool_2(y=2)
                 "tool_calls": [
                   {
                     "name": "tool_1",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   },
                   {
                     "name": "tool_2",
-                    "args": {
+                    "arguments": {
                       "y": 2
                     }
                   }
@@ -348,13 +348,13 @@ This is some more text.
                 "tool_calls": [
                   {
                     "name": "tool_1",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   },
                   {
                     "name": "tool_2",
-                    "args": {
+                    "arguments": {
                       "y": 2
                     }
                   }
@@ -394,13 +394,13 @@ This is some more text.
                 "tool_calls": [
                   {
                     "name": "tool_1",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   },
                   {
                     "name": "tool_2",
-                    "args": {
+                    "arguments": {
                       "y": 2
                     }
                   }

@@ -35,7 +35,7 @@ TEST(JsonParserUtilsTest, ParseSingleToolCall) {
               })json"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "print",
-                "args": {
+                "arguments": {
                   "x": 1
                 }
               }])json")));
@@ -60,13 +60,13 @@ TEST(JsonParserUtilsTest, ParseMultipleToolCalls) {
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([
                 {
                   "name": "func1",
-                  "args": {
+                  "arguments": {
                     "a": "hello"
                   }
                 },
                 {
                   "name": "func2",
-                  "args": {
+                  "arguments": {
                     "b": true,
                     "c": null
                   }
@@ -81,7 +81,7 @@ TEST(JsonParserUtilsTest, ParseEmptyArguments) {
               })json"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "empty_args_func",
-                "args": {}
+                "arguments": {}
               }])json")));
 }
 
@@ -103,7 +103,7 @@ TEST(JsonParserUtilsTest, ParseComplexArguments) {
               })json"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "complex_func",
-                "args": {
+                "arguments": {
                   "str_arg": "value",
                   "int_arg": 123,
                   "float_arg": -4.5,

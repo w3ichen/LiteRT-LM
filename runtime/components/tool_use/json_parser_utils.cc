@@ -189,7 +189,7 @@ void JsonListener::enterFunctionCall(
       status_ = false;
       return;
     }
-    tool_call["args"] = std::move(parsed_args).value();
+    tool_call["arguments"] = std::move(parsed_args).value();
     tool_calls_.push_back(tool_call);
     status_ = true;
   } else if (ctx->emptyFunctionCall()) {

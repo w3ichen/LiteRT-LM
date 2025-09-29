@@ -174,7 +174,7 @@ tool_name(x=1)
     "tool_calls": [
       {
         "name": "tool_name",
-        "args": {
+        "arguments": {
           "x": 1
         }
       }

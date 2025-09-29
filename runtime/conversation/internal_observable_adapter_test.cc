@@ -130,7 +130,7 @@ TEST_F(InternalObservableAdapterTest, ToolCall) {
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -159,7 +159,7 @@ TEST_F(InternalObservableAdapterTest, TextAndToolCall) {
                             "tool_calls": [
                               {
                                 "name": "tool_name",
-                                "args": {
+                                "arguments": {
                                   "x": 1
                                 }
                               }
@@ -183,7 +183,7 @@ TEST_F(InternalObservableAdapterTest, SplitCodeFenceStart) {
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -208,7 +208,7 @@ TEST_F(InternalObservableAdapterTest, TextBeforeSplitCodeFenceStart) {
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -231,7 +231,7 @@ TEST_F(InternalObservableAdapterTest, ToolCallAfterSplitCodeFenceStart) {
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -254,7 +254,7 @@ TEST_F(InternalObservableAdapterTest, TextOnBothSidesOfCodeFenceStart) {
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -277,7 +277,7 @@ TEST_F(InternalObservableAdapterTest, SplitCodeFenceEnd) {
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -300,7 +300,7 @@ TEST_F(InternalObservableAdapterTest, TextBeforeSplitCodeFenceEnd) {
                 "tool_calls": [
                   {
                     "name": "tool_name",
-                    "args": {
+                    "arguments": {
                       "x": 1
                     }
                   }
@@ -323,7 +323,7 @@ TEST_F(InternalObservableAdapterTest, TextAfterSplitCodeFenceEnd) {
                             "tool_calls": [
                               {
                                 "name": "tool_name",
-                                "args": {
+                                "arguments": {
                                   "x": 1
                                 }
                               }
@@ -348,7 +348,7 @@ TEST_F(InternalObservableAdapterTest,
                             "tool_calls": [
                               {
                                 "name": "tool_name",
-                                "args": {
+                                "arguments": {
                                   "x": 1
                                 }
                               }
@@ -373,13 +373,13 @@ TEST_F(InternalObservableAdapterTest, ParallelToolCalls) {
                   "tool_calls": [
                     {
                       "name": "tool_a",
-                      "args": {
+                      "arguments": {
                         "x": 1
                       }
                     },
                     {
                       "name": "tool_b",
-                      "args": {
+                      "arguments": {
                         "y": "z"
                       }
                     }
@@ -404,7 +404,7 @@ TEST_F(InternalObservableAdapterTest, TwoConsecutiveToolCodeBlocks) {
                             "tool_calls": [
                               {
                                 "name": "tool_a",
-                                "args": {
+                                "arguments": {
                                   "x": 1
                                 }
                               }
@@ -415,7 +415,7 @@ TEST_F(InternalObservableAdapterTest, TwoConsecutiveToolCodeBlocks) {
                             "tool_calls": [
                               {
                                 "name": "tool_b",
-                                "args": {
+                                "arguments": {
                                   "y": "z"
                                 }
                               }

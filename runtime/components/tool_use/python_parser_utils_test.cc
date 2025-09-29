@@ -30,7 +30,7 @@ TEST(PythonParserUtilsTest, ParseSingleToolCall) {
   EXPECT_THAT(ParsePythonExpression("function_name(x='hello')"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": "hello"
                 }
               }])json")));
@@ -40,13 +40,13 @@ TEST(PythonParserUtilsTest, ParseMultipleToolCalls) {
   EXPECT_THAT(ParsePythonExpression("[func_1(x='hello'), func_2(y=2)]"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "func_1",
-                "args": {
+                "arguments": {
                   "x": "hello"
                 }
               },
               {
                 "name": "func_2",
-                "args": {
+                "arguments": {
                   "y": 2
                 }
               }])json")));
@@ -78,7 +78,7 @@ TEST(PythonParserUtilsTest, ParseIntegerArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=1)"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": 1
                 }
               }])json")));
@@ -88,7 +88,7 @@ TEST(PythonParserUtilsTest, ParseNegativeIntegerArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=-1)"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": -1
                 }
               }])json")));
@@ -98,7 +98,7 @@ TEST(PythonParserUtilsTest, ParseFloatArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=1.1)"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": 1.1
                 }
               }])json")));
@@ -108,7 +108,7 @@ TEST(PythonParserUtilsTest, ParseNegativeFloatArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=-1.1)"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": -1.1
                 }
               }])json")));
@@ -118,7 +118,7 @@ TEST(PythonParserUtilsTest, ParseNegativeFloatNoLeadingDigit) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=-.1)"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": -0.1
                 }
               }])json")));
@@ -128,7 +128,7 @@ TEST(PythonParserUtilsTest, ParseBooleanArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=True)"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": true
                 }
               }])json")));
@@ -138,7 +138,7 @@ TEST(PythonParserUtilsTest, ParseStringArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x='hello')"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": "hello"
                 }
               }])json")));
@@ -148,7 +148,7 @@ TEST(PythonParserUtilsTest, ParseListArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=[1, 2, 3])"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": [1, 2, 3]
                 }
               }])json")));
@@ -158,7 +158,7 @@ TEST(PythonParserUtilsTest, ParseMixedTypesListArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=[1, 2, 'hello'])"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": [1, 2, "hello"]
                 }
               }])json")));
@@ -168,7 +168,7 @@ TEST(PythonParserUtilsTest, ParseNestedListArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=[[1, 2], [3, 4]])"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": [[1, 2], [3, 4]]
                 }
               }])json")));
@@ -178,7 +178,7 @@ TEST(PythonParserUtilsTest, ParseEmptyListArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=[])"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": []
                 }
               }])json")));
@@ -189,7 +189,7 @@ TEST(PythonParserUtilsTest, ParseDictArgument) {
                   "function_name(x={'hello': 'world', 'foo': 'bar'})"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": {"hello": "world", "foo": "bar"}
                 }
               }])json")));
@@ -201,7 +201,7 @@ TEST(PythonParserUtilsTest, ParseNestedDictArgument) {
           "function_name(x={'outer': {'hello': 'world', 'foo': 'bar'}})"),
       IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": {"outer": {"hello": "world", "foo": "bar"}}
                 }
               }])json")));
@@ -211,7 +211,7 @@ TEST(PythonParserUtilsTest, ParseEmptyDictArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x={})"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": {}
                 }
               }])json")));
@@ -221,7 +221,7 @@ TEST(PythonParserUtilsTest, ParseNoneArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=None)"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": null
                 }
               }])json")));
@@ -231,7 +231,7 @@ TEST(PythonParserUtilsTest, ParseLiteralStringNoneArgument) {
   EXPECT_THAT(ParsePythonExpression("function_name(x=\"None\")"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": "None"
                 }
               }])json")));
@@ -242,7 +242,7 @@ TEST(PythonParserUtilsTest, ParseObjectArgument) {
       ParsePythonExpression("function_name(x=Obj(hello='world', foo=1))"),
       IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": {
                     "__type__": "Obj",
                     "hello": "world",
@@ -258,7 +258,7 @@ TEST(PythonParserUtilsTest, ParseListOfDictsArgument) {
                   "{'foo': 1, 'bar': 2}])"),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
                 "name": "function_name",
-                "args": {
+                "arguments": {
                   "x": [
                     {
                       "hello": "world",

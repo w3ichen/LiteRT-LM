@@ -46,13 +46,13 @@ namespace litert::lm {
 // [
 //   {
 //     "name": "tool_1",
-//     "args": {
+//     "arguments": {
 //       "x": "foo"
 //     }
 //   },
 //   {
 //     "name": "tool_2",
-//     "args": {
+//     "arguments": {
 //       "y": "bar"
 //     }
 //   }

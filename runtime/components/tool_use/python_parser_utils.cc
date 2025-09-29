@@ -220,13 +220,14 @@ void PythonListener::enterFunctionCall(
         status_ = false;
         return;
       }
-      if (tool_call.contains("args") && tool_call["args"].contains(name)) {
+      if (tool_call.contains("arguments") &&
+          tool_call["arguments"].contains(name)) {
         // Duplicate arg name.
         status_ = false;
         return;
       }
       // The parsed_value is already nlohmann::ordered_json.
-      tool_call["args"][name] = parsed_value.value();
+      tool_call["arguments"][name] = parsed_value.value();
     }
   } else if (ctx->emptyFunctionCall()) {
     if (ctx->emptyFunctionCall()->NAME() == nullptr) {
