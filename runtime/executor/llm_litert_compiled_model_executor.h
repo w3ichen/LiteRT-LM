@@ -22,6 +22,7 @@
 
 #include "absl/base/nullability.h"  // from @com_google_absl
 #include "absl/container/flat_hash_map.h"  // from @com_google_absl
+#include "absl/container/flat_hash_set.h"  // from @com_google_absl
 #include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
@@ -161,10 +162,21 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
   // Caller of this function is responsible for capturing the output.
   absl::Status DecodeInternal(ExecutorInputs inputs);
 
+  // Create Prefill input buffers for a given signature.
+  absl::Status CreatePrefillInputBuffers(absl::string_view prefill_signature);
+
   LlmExecutorSettings executor_settings_;
   ::litert::Environment env_;
   const ::litert::Model& model_;
   ::litert::CompiledModel compiled_model_;
+  // The signatures in the set below have already had their buffers created and
+  // those buffers can be found in the prefill_input_buffers_ and
+  // prefill_output_buffers_.
+  //
+  // Signature names are unique across all signatures in a model so it is safe
+  // to refer to them by just their unique name.
+  absl::flat_hash_set<absl::string_view>
+      prefill_signatures_with_created_buffers_;
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
       prefill_input_buffers_;
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>

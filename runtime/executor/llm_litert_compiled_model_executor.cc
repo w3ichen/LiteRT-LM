@@ -195,52 +195,11 @@ absl::Status LlmLiteRtCompiledModelExecutor::Prefill(
   ASSIGN_OR_RETURN(auto work_groups, GetOptimizedPrefillWorkGroups(
                                          prefill_signature_map_, ids.size()));
   for (const auto& [prefill_signature, prefill_length] : work_groups) {
-    // Create input_token, positions and attn_mask buffers after determining
-    // the prefill length.
-    if (!signatures_.input_tokens.empty()) {
-      auto tokens_buffer = compiled_model_.CreateInputBuffer(
-          prefill_signature, signatures_.input_tokens);
-      prefill_input_buffers_[signatures_.input_tokens] =
-          std::move(*tokens_buffer);
-    } else {
-      // If input_tokens is empty, we must have input_embeddings.
-      if (!signatures_.input_embeddings.has_value()) {
-        return absl::FailedPreconditionError(
-            "Input tokens or embeddings must be provided.");
-      }
-      if (embedding_lookup_ == nullptr) {
-        return absl::FailedPreconditionError(
-            "Input embeddings required by signature but embedding lookup "
-            "model is not initialized.");
-      }
-      auto embeddings_buffer = compiled_model_.CreateInputBuffer(
-          prefill_signature, signatures_.input_embeddings.value());
-      prefill_input_buffers_[signatures_.input_embeddings.value()] =
-          std::move(*embeddings_buffer);
-
-      // We may have per layer embedding as well.
-      if (signatures_.input_per_layer_embeddings.has_value()) {
-        if (embedding_lookup_ == nullptr) {
-          return absl::FailedPreconditionError(
-              "Input per layer embeddings required by signature but embedding "
-              "lookup model is not initialized.");
-        }
-        auto per_layer_embeddings_buffer = compiled_model_.CreateInputBuffer(
-            prefill_signature, signatures_.input_per_layer_embeddings.value());
-        prefill_input_buffers_[signatures_.input_per_layer_embeddings.value()] =
-            std::move(*per_layer_embeddings_buffer);
-      }
-    }
-    auto positions_buffer = compiled_model_.CreateInputBuffer(
-        prefill_signature, signatures_.input_positions);
-    prefill_input_buffers_[signatures_.input_positions] =
-        std::move(*positions_buffer);
-
-    if (signatures_.input_attn_mask.has_value()) {
-      auto attn_mask_buffer = compiled_model_.CreateInputBuffer(
-          prefill_signature, signatures_.input_attn_mask.value());
-      prefill_input_buffers_[signatures_.input_attn_mask.value()] =
-          std::move(*attn_mask_buffer);
+    // Keep track of the signatures that have already had their buffers
+    // created only create them once.
+    if (!prefill_signatures_with_created_buffers_.contains(prefill_signature)) {
+      RETURN_IF_ERROR(CreatePrefillInputBuffers(prefill_signature));
+      prefill_signatures_with_created_buffers_.insert(prefill_signature);
     }
     RETURN_IF_ERROR(PrefillInternal(prefill_signature,
                                     ids.subspan(/*pos=*/0, prefill_length)));
@@ -248,6 +207,58 @@ absl::Status LlmLiteRtCompiledModelExecutor::Prefill(
   }
   RET_CHECK_EQ(ids.size(), 0).SetCode(absl::StatusCode::kInternal)
       << "Work groups not covering the entire prefill input.";
+  return absl::OkStatus();
+}
+
+absl::Status LlmLiteRtCompiledModelExecutor::CreatePrefillInputBuffers(
+    absl::string_view prefill_signature) {
+  // Create input_token, positions and attn_mask buffers after determining
+  // the prefill length.
+  if (!signatures_.input_tokens.empty()) {
+    auto tokens_buffer = compiled_model_.CreateInputBuffer(
+        prefill_signature, signatures_.input_tokens);
+    prefill_input_buffers_[signatures_.input_tokens] =
+        std::move(*tokens_buffer);
+  } else {
+    // If input_tokens is empty, we must have input_embeddings.
+    if (!signatures_.input_embeddings.has_value()) {
+      return absl::FailedPreconditionError(
+          "Input tokens or embeddings must be provided.");
+    }
+    if (embedding_lookup_ == nullptr) {
+      return absl::FailedPreconditionError(
+          "Input embeddings required by signature but embedding lookup "
+          "model is not initialized.");
+    }
+    auto embeddings_buffer = compiled_model_.CreateInputBuffer(
+        prefill_signature, signatures_.input_embeddings.value());
+    prefill_input_buffers_[signatures_.input_embeddings.value()] =
+        std::move(*embeddings_buffer);
+
+    // We may have per layer embedding as well.
+    if (signatures_.input_per_layer_embeddings.has_value()) {
+      if (embedding_lookup_ == nullptr) {
+        return absl::FailedPreconditionError(
+            "Input per layer embeddings required by signature but "
+            "embedding lookup model is not initialized.");
+      }
+      auto per_layer_embeddings_buffer = compiled_model_.CreateInputBuffer(
+          prefill_signature, signatures_.input_per_layer_embeddings.value());
+      prefill_input_buffers_[signatures_.input_per_layer_embeddings.value()] =
+          std::move(*per_layer_embeddings_buffer);
+    }
+  }
+  auto positions_buffer = compiled_model_.CreateInputBuffer(
+      prefill_signature, signatures_.input_positions);
+  prefill_input_buffers_[signatures_.input_positions] =
+      std::move(*positions_buffer);
+
+  if (signatures_.input_attn_mask.has_value()) {
+    auto attn_mask_buffer = compiled_model_.CreateInputBuffer(
+        prefill_signature, signatures_.input_attn_mask.value());
+    prefill_input_buffers_[signatures_.input_attn_mask.value()] =
+        std::move(*attn_mask_buffer);
+  }
   return absl::OkStatus();
 }
 
