@@ -23,6 +23,7 @@
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/str_cat.h"  // from @com_google_absl
+#include "absl/strings/str_join.h"  // from @com_google_absl
 #include "runtime/executor/executor_settings_base.h"
 #include "runtime/util/logging.h"
 #include "runtime/util/status_macros.h"  // NOLINT
@@ -52,7 +53,8 @@ std::ostream& operator<<(std::ostream& os, const CpuConfig& config) {
 }
 
 std::ostream& operator<<(std::ostream& os, const AdvancedSettings& settings) {
-  os << "prefill_batch_size: " << settings.prefill_batch_size << "\n";
+  os << "prefill_batch_sizes: ["
+     << absl::StrJoin(settings.prefill_batch_sizes, ", ") << "]\n";
   os << "configure_magic_numbers: " << settings.configure_magic_numbers << "\n";
   os << "verify_magic_numbers: " << settings.verify_magic_numbers << "\n";
   os << "clear_kv_cache_before_prefill: "

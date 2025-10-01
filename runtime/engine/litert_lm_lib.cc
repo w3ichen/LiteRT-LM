@@ -271,7 +271,7 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
   }
 
   AdvancedSettings advanced_settings{
-      .prefill_batch_size = settings.prefill_batch_size,
+      .prefill_batch_sizes = settings.prefill_batch_sizes,
       .configure_magic_numbers = settings.configure_magic_numbers,
       .verify_magic_numbers = settings.verify_magic_numbers,
       .clear_kv_cache_before_prefill = settings.clear_kv_cache_before_prefill,

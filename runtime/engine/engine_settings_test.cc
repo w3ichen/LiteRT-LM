@@ -485,7 +485,9 @@ TEST(SessionConfigTest,
   const auto& main_settings1 = settings->GetMainExecutorSettings();
   EXPECT_EQ(main_settings1.GetMaxNumTokens(), 4096);
   EXPECT_TRUE(main_settings1.GetAdvancedSettings().has_value());
-  EXPECT_EQ(main_settings1.GetAdvancedSettings()->prefill_batch_size,
+  EXPECT_EQ(main_settings1.GetAdvancedSettings()->prefill_batch_sizes.size(),
+            1);
+  EXPECT_EQ(*main_settings1.GetAdvancedSettings()->prefill_batch_sizes.begin(),
             kNumInputPromptTokens + /*margin=*/2);
 }
 
@@ -506,7 +508,9 @@ TEST(SessionConfigTest,
   const auto& main_settings1 = settings->GetMainExecutorSettings();
   EXPECT_EQ(main_settings1.GetMaxNumTokens(), 8192);
   EXPECT_TRUE(main_settings1.GetAdvancedSettings().has_value());
-  EXPECT_EQ(main_settings1.GetAdvancedSettings()->prefill_batch_size,
+  EXPECT_EQ(main_settings1.GetAdvancedSettings()->prefill_batch_sizes.size(),
+            1);
+  EXPECT_EQ(*main_settings1.GetAdvancedSettings()->prefill_batch_sizes.begin(),
             kNumInputPromptTokens + /*margin=*/2);
 }
 

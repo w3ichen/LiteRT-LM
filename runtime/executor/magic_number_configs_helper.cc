@@ -14,8 +14,12 @@
 
 #include "runtime/executor/magic_number_configs_helper.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <iterator>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -34,7 +38,7 @@ namespace {
 
 struct MagicNumbers {
   int64_t context_length = 0;
-  int64_t prefill_length = 0;
+  std::vector<int64_t> prefill_lengths;
 };
 
 constexpr absl::string_view kPrefillSignaturePrefix = "prefill";
@@ -83,6 +87,8 @@ Expected<void> SetMagicNumberIfPrime(const Subgraph& subgraph,
   return {};
 }
 
+// Returns the magic numbers from the model. prefill_lengths are sorted in
+// ascending order.
 Expected<MagicNumbers> GetMagicNumbersFromModel(const Model& litert_model) {
   auto num_signatures = litert_model.GetNumSignatures();
   MagicNumbers magic_numbers;
@@ -96,8 +102,12 @@ Expected<MagicNumbers> GetMagicNumbersFromModel(const Model& litert_model) {
           LITERT_RETURN_IF_ERROR(SetMagicNumberIfPrime(
               subgraph, input_name, magic_numbers.context_length));
         } else if (absl::StrContains(input_name, kInputPosSubstr)) {
-          LITERT_RETURN_IF_ERROR(SetMagicNumberIfPrime(
-              subgraph, input_name, magic_numbers.prefill_length));
+          int64_t prefill_length = 0;
+          LITERT_RETURN_IF_ERROR(
+              SetMagicNumberIfPrime(subgraph, input_name, prefill_length));
+          if (prefill_length > 0) {
+            magic_numbers.prefill_lengths.push_back(prefill_length);
+          }
         }
       }
     } else if (signature.Key().starts_with(kDecodeSignaturePrefix)) {
@@ -109,6 +119,9 @@ Expected<MagicNumbers> GetMagicNumbersFromModel(const Model& litert_model) {
       }
     }
   }
+
+  std::sort(magic_numbers.prefill_lengths.begin(),
+            magic_numbers.prefill_lengths.end());
   return magic_numbers;
 }
 
@@ -152,9 +165,14 @@ GetVerificationPairs(const Model& litert_model,
             if (dim == magic_numbers.context_length &&
                 test_dim == target_numbers.context_length) {
               continue;
-            } else if (dim == magic_numbers.prefill_length &&
-                       test_dim == target_numbers.prefill_length) {
-              continue;
+            }
+            auto it = std::find(magic_numbers.prefill_lengths.begin(),
+                                magic_numbers.prefill_lengths.end(), dim);
+            if (it != magic_numbers.prefill_lengths.end()) {
+              size_t diff = it - magic_numbers.prefill_lengths.begin();
+              if (test_dim == target_numbers.prefill_lengths[diff]) {
+                continue;
+              }
             }
             is_same_shape = false;
             break;
@@ -206,22 +224,21 @@ std::vector<Environment::Option> MagicNumberConfigsHelper::GetLiteRtEnvOptions(
     const Model& litert_model, const LlmExecutorSettings& executor_settings) {
   auto magic_numbers = GetMagicNumbersFromModel(litert_model);
   if (!magic_numbers || (magic_numbers->context_length == 0 &&
-                         magic_numbers->prefill_length == 0)) {
+                         magic_numbers->prefill_lengths.empty())) {
     return {};
   }
 
   // Build magic number configs.
+  int prefill_config_index_base = magic_numbers->context_length > 0 ? 1 : 0;
   int num_configs =
-      magic_numbers->context_length > 0 && magic_numbers->prefill_length > 0
-          ? 2
-          : 1;
+      prefill_config_index_base + magic_numbers->prefill_lengths.size();
   magic_number_configs_ = UniqueCPtr<LiteRtMagicNumberConfigs>(
       reinterpret_cast<LiteRtMagicNumberConfigs*>(
           malloc(sizeof(LiteRtMagicNumberConfigs) +
                  num_configs * sizeof(LiteRtMagicNumberConfig))));
   magic_number_configs_->num_configs = num_configs;
 
-  MagicNumbers target_numbers{.context_length = 0, .prefill_length = 0};
+  MagicNumbers target_numbers{.context_length = 0};
   // Magic number configs for context length.
   if (magic_numbers->context_length != 0) {
     auto& config = magic_number_configs_->configs[0];
@@ -236,14 +253,59 @@ std::vector<Environment::Option> MagicNumberConfigsHelper::GetLiteRtEnvOptions(
     advanced_settings = *executor_settings.GetAdvancedSettings();
   }
 
-  // Magic number configs for prefill length.
-  if (magic_numbers->prefill_length != 0) {
-    auto& config = magic_number_configs_
-                       ->configs[magic_numbers->context_length == 0 ? 0 : 1];
-    config.magic_number = magic_numbers->prefill_length;
-    config.target_number = target_numbers.prefill_length = GetTargetNumber(
-        config.magic_number, advanced_settings.prefill_batch_size);
-    config.signature_prefix = kPrefillSignaturePrefix.data();
+  // How many extra magic numbers are there. If > 0, we can try to match the
+  // magic number as close to the target number as possible.
+  // If < 0, we have too many target numbers and skip first N target numbers.
+  int extra_magic_numbers = magic_numbers->prefill_lengths.size() -
+                            advanced_settings.prefill_batch_sizes.size();
+  if (extra_magic_numbers < 0) {
+    ABSL_LOG(WARNING) << "Too many prefill batch sizes="
+                      << advanced_settings.prefill_batch_sizes.size()
+                      << " for magic numbers of prefill lengths="
+                      << magic_numbers->prefill_lengths.size() << ". "
+                      << -extra_magic_numbers
+                      << " small prefill batch sizes won't be used.";
+  }
+
+  if (!magic_numbers->prefill_lengths.empty()) {
+    // Magic number configs for prefill length. Try to match with the smallest
+    // magic number greater than or equal to the target number. Log warning if
+    // there is no such magic numbers, but don't fail.
+    auto it_prefill = advanced_settings.prefill_batch_sizes.begin();
+    // Skip first -extra_magic_numbers target numbers.
+    for (; extra_magic_numbers < 0; ++extra_magic_numbers) {
+      ++it_prefill;
+    }
+
+    for (auto magic_number : magic_numbers->prefill_lengths) {
+      // Fill with default target numbers until the magic number is larger than
+      // or equal to the prefill batch size.
+      if (it_prefill == advanced_settings.prefill_batch_sizes.end() ||
+          *it_prefill > magic_number) {
+        target_numbers.prefill_lengths.push_back(
+            GetDefaultTargetNumber(magic_number));
+      } else {
+        target_numbers.prefill_lengths.push_back(*it_prefill);
+        ++it_prefill;
+      }
+    }
+
+    if (it_prefill != advanced_settings.prefill_batch_sizes.end()) {
+      auto num_left = std::distance(
+          it_prefill, advanced_settings.prefill_batch_sizes.end());
+      ABSL_LOG(WARNING) << "No magic numbers for prefill length larger than or "
+                        << "equal to the prefill batch size=" << *it_prefill
+                        << ". Ignore last " << num_left
+                        << " prefill batch sizes.";
+    }
+
+    for (int i = 0; i < magic_numbers->prefill_lengths.size(); ++i) {
+      auto& config =
+          magic_number_configs_->configs[prefill_config_index_base + i];
+      config.magic_number = magic_numbers->prefill_lengths[i];
+      config.target_number = target_numbers.prefill_lengths[i];
+      config.signature_prefix = kPrefillSignaturePrefix.data();
+    }
   }
 
   if (advanced_settings.verify_magic_numbers) {

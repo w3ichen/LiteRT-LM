@@ -22,6 +22,7 @@
 // Consider run_llm_inference_engine.sh as an example to run on android device.
 
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -32,8 +33,12 @@
 #include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/log/globals.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
+#include "absl/status/statusor.h"  // from @com_google_absl
+#include "absl/strings/numbers.h"  // from @com_google_absl
+#include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "litert/c/litert_logging.h"  // from @litert
 #include "runtime/engine/litert_lm_lib.h"
+#include "runtime/util/status_macros.h"
 
 ABSL_FLAG(std::string, backend, "gpu",
           "Executor backend to use for LLM execution (cpu, gpu, etc.)");
@@ -57,16 +62,16 @@ ABSL_FLAG(int, max_num_tokens, 0,
           "length will be determined by some heuristic. On benchmark mode, it "
           "will be set to one equal to or greater than "
           "benchmark_prefill_tokens + benchmark_decode_tokens.");
-ABSL_FLAG(int, prefill_batch_size, 0,
-          "Maximum number of prefill tokens processed at once. If 0, it will "
-          "be the same as the length of the input prompt tokens or "
-          "benchmark_prefill_tokens when benchmark mode is enabled.");
+ABSL_FLAG(std::vector<std::string>, prefill_batch_sizes, {},
+          "A list of maximum numbers of prefill tokens processed at once. If "
+          "empty, it will be the list of one entry with the length of input "
+          "prompt tokens or benchmark_prefill_tokens when benchmark mode is "
+          "enabled.");
 ABSL_FLAG(bool, benchmark, false, "Benchmark the LLM execution.");
-ABSL_FLAG(
-    int, benchmark_prefill_tokens, 0,
-    "If benchmark is true and the value is larger than 0, the benchmark will "
-    "use this number to set the number of prefill tokens (regardless of the "
-    "input prompt).");
+ABSL_FLAG(int, benchmark_prefill_tokens, 0,
+          "If benchmark is true and the value is larger than 0, the benchmark "
+          "will use this number to set the number of prefill tokens "
+          "(regardless of the input prompt).");
 ABSL_FLAG(int, benchmark_decode_tokens, 0,
           "If benchmark is true and the value is larger than 0, the benchmark "
           "will use this number to set the number of decode steps (regardless "
@@ -130,6 +135,20 @@ LiteRtLogSeverity AbslMinLogLevelToLiteRtLogSeverity(
   }
 }
 
+absl::StatusOr<std::set<int>> ParsePrefillBatchSizes(
+    const std::vector<std::string>& prefill_batch_sizes) {
+  std::set<int> parsed_prefill_batch_sizes;
+  for (const auto& prefill_batch_size : prefill_batch_sizes) {
+    int size;
+    if (!absl::SimpleAtoi(prefill_batch_size, &size)) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Invalid prefill batch size: ", prefill_batch_size));
+    }
+    parsed_prefill_batch_sizes.insert(size);
+  }
+  return parsed_prefill_batch_sizes;
+}
+
 absl::Status MainHelper(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
   LiteRtSetMinLoggerSeverity(
@@ -141,7 +160,7 @@ absl::Status MainHelper(int argc, char** argv) {
         << "Example usage: ./litert_lm_main --model_path=<model_path> "
            "[--input_prompt=<input_prompt>] [--backend=<cpu|gpu|npu>] "
            "[--max_num_tokens=<max_num_tokens>] "
-           "[--prefill_batch_size=<prefill_batch_size>]"
+           "[--prefill_batch_sizes=<size1>[,<size2>,...]]"
            "[--vision_backend=<cpu|gpu>] [--audio_backend=<cpu|gpu>] "
            "[--image_files=<image_path1>,<image_path2>,...] "
            "[--audio_files=<audio_path1>,<audio_path2>,...] "
@@ -169,7 +188,9 @@ absl::Status MainHelper(int argc, char** argv) {
   settings.model_path = absl::GetFlag(FLAGS_model_path);
   settings.input_prompt = absl::GetFlag(FLAGS_input_prompt);
   settings.max_num_tokens = absl::GetFlag(FLAGS_max_num_tokens);
-  settings.prefill_batch_size = absl::GetFlag(FLAGS_prefill_batch_size);
+  ASSIGN_OR_RETURN(
+      settings.prefill_batch_sizes,
+      ParsePrefillBatchSizes(absl::GetFlag(FLAGS_prefill_batch_sizes)));
   settings.image_files = absl::GetFlag(FLAGS_image_files);
   settings.audio_files = absl::GetFlag(FLAGS_audio_files);
   settings.benchmark = absl::GetFlag(FLAGS_benchmark);
@@ -200,8 +221,8 @@ absl::Status MainHelper(int argc, char** argv) {
       settings.max_num_tokens =
           settings.benchmark_prefill_tokens + settings.benchmark_decode_tokens;
     }
-    if (settings.prefill_batch_size == 0) {
-      settings.prefill_batch_size = settings.benchmark_prefill_tokens;
+    if (settings.prefill_batch_sizes.empty()) {
+      settings.prefill_batch_sizes.insert(settings.benchmark_prefill_tokens);
     }
   }
 

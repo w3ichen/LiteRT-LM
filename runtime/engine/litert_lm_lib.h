@@ -16,6 +16,7 @@
 #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_ENGINE_LITERT_LM_LIB_H_
 
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -32,7 +33,7 @@ struct LiteRtLmSettings {
   std::string model_path;
   std::string input_prompt = "What is the tallest building in the world?";
   int max_num_tokens = 0;
-  int prefill_batch_size = 0;
+  std::set<int> prefill_batch_sizes;
   std::optional<std::vector<std::string>> image_files = std::nullopt;
   std::optional<std::vector<std::string>> audio_files = std::nullopt;
   bool benchmark = false;

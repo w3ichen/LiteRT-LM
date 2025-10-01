@@ -52,6 +52,17 @@ constexpr absl::string_view kTestModelPathContextLength =
 //   test_decode_1280: context_length = 1280
 constexpr absl::string_view kTestModelPathBoth = "magic_test_both.tflite";
 
+// Model with magic numbers with multiple prefill lengths.
+//   prefill_4099: context_length = 8209, prefill_length = 4099
+//   prefill_1031: context_length = 8209, prefill_length = 1031
+//   prefill_257: context_length = 8209, prefill_length = 257
+//   prefill_67: context_length = 8209, prefill_length = 67
+//   decode: context_length = 8209
+//   test_prefill_1024: context_length = 1280, prefill_length = 1024
+//   test_prefill_256: context_length = 1280, prefill_length = 256
+//   test_decode_1280: context_length = 1280
+constexpr absl::string_view kTestModelPathMulti = "magic_test_multi.tflite";
+
 absl::StatusOr<Model> LoadModelFromFile(absl::string_view model_path) {
   auto model_path_in_srcdir =
       std::filesystem::path(::testing::SrcDir()) /
@@ -87,7 +98,7 @@ TEST(MagicNumberConfigsHelperTest, None_ExplictSettings) {
   auto executor_settings = GetLlmExecutorSettings();
   EXPECT_OK(executor_settings);
   executor_settings->SetMaxNumTokens(1280);
-  AdvancedSettings advanced_settings{.prefill_batch_size = 1024};
+  AdvancedSettings advanced_settings{.prefill_batch_sizes = {1024}};
   executor_settings->SetAdvancedSettings(advanced_settings);
 
   MagicNumberConfigsHelper helper;
@@ -233,7 +244,7 @@ TEST(MagicNumberConfigsHelperTest, Both_ExplictSettings) {
   auto executor_settings = GetLlmExecutorSettings();
   EXPECT_OK(executor_settings);
   executor_settings->SetMaxNumTokens(1280);
-  AdvancedSettings advanced_settings{.prefill_batch_size = 1024};
+  AdvancedSettings advanced_settings{.prefill_batch_sizes = {1024}};
   executor_settings->SetAdvancedSettings(advanced_settings);
 
   MagicNumberConfigsHelper helper;
@@ -262,7 +273,7 @@ TEST(MagicNumberConfigsHelperTest, Both_ExplictSettingsLargerThanMagicNumbers) {
   auto executor_settings = GetLlmExecutorSettings();
   EXPECT_OK(executor_settings);
   executor_settings->SetMaxNumTokens(9000);
-  AdvancedSettings advanced_settings{.prefill_batch_size = 5000};
+  AdvancedSettings advanced_settings{.prefill_batch_sizes = {5000}};
   executor_settings->SetAdvancedSettings(advanced_settings);
 
   MagicNumberConfigsHelper helper;
@@ -291,7 +302,7 @@ TEST(MagicNumberConfigsHelperTest, Both_ExplictSettingsWithVerifications) {
   auto executor_settings = GetLlmExecutorSettings();
   EXPECT_OK(executor_settings);
   executor_settings->SetMaxNumTokens(1280);
-  AdvancedSettings advanced_settings{.prefill_batch_size = 1024,
+  AdvancedSettings advanced_settings{.prefill_batch_sizes = {1024},
                                      .verify_magic_numbers = true};
   executor_settings->SetAdvancedSettings(advanced_settings);
 
@@ -334,7 +345,8 @@ TEST(MagicNumberConfigsHelperTest,
   auto executor_settings = GetLlmExecutorSettings();
   EXPECT_OK(executor_settings);
   executor_settings->SetMaxNumTokens(1280);
-  AdvancedSettings advanced_settings{.prefill_batch_size = 512,  // Not matched.
+  // prefill_batch_sizes is not matched with test_prefill_1280.
+  AdvancedSettings advanced_settings{.prefill_batch_sizes = {512},
                                      .verify_magic_numbers = true};
   executor_settings->SetAdvancedSettings(advanced_settings);
 
@@ -365,6 +377,353 @@ TEST(MagicNumberConfigsHelperTest,
 
   // prefill won't be verified because prefill_batch_size is not matched with
   // test_prefill_1280.
+}
+
+TEST(MagicNumberConfigsHelperTest, Multi_DefaultSettings) {
+  auto model = LoadModelFromFile(kTestModelPathMulti);
+  EXPECT_OK(model);
+  auto executor_settings = GetLlmExecutorSettings();
+  EXPECT_OK(executor_settings);
+
+  MagicNumberConfigsHelper helper;
+  auto env_options = helper.GetLiteRtEnvOptions(*model, *executor_settings);
+  EXPECT_EQ(env_options.size(), 1);
+  EXPECT_NE(helper.magic_number_configs(), nullptr);
+  EXPECT_EQ(helper.magic_number_configs()->num_configs, 5);
+
+  const auto& config0 = helper.magic_number_configs()->configs[0];
+  EXPECT_EQ(config0.magic_number, 8209);
+  EXPECT_EQ(config0.target_number, 8192);
+  EXPECT_EQ(config0.signature_prefix, nullptr);
+
+  const auto& config1 = helper.magic_number_configs()->configs[1];
+  EXPECT_EQ(config1.magic_number, 67);
+  EXPECT_EQ(config1.target_number, 64);
+  EXPECT_EQ(std::string(config1.signature_prefix), "prefill");
+
+  const auto& config2 = helper.magic_number_configs()->configs[2];
+  EXPECT_EQ(config2.magic_number, 257);
+  EXPECT_EQ(config2.target_number, 256);
+  EXPECT_EQ(std::string(config2.signature_prefix), "prefill");
+
+  const auto& config3 = helper.magic_number_configs()->configs[3];
+  EXPECT_EQ(config3.magic_number, 1031);
+  EXPECT_EQ(config3.target_number, 1024);
+  EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
+
+  const auto& config4 = helper.magic_number_configs()->configs[4];
+  EXPECT_EQ(config4.magic_number, 4099);
+  EXPECT_EQ(config4.target_number, 4096);
+  EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
+
+  // Verifications are disabled by default.
+  EXPECT_EQ(helper.magic_number_verifications(), nullptr);
+}
+
+TEST(MagicNumberConfigsHelperTest, Multi_LessExplictSettings) {
+  auto model = LoadModelFromFile(kTestModelPathMulti);
+  EXPECT_OK(model);
+  auto executor_settings = GetLlmExecutorSettings();
+  EXPECT_OK(executor_settings);
+  executor_settings->SetMaxNumTokens(1280);
+  AdvancedSettings advanced_settings{.prefill_batch_sizes = {1024, 128}};
+  executor_settings->SetAdvancedSettings(advanced_settings);
+
+  MagicNumberConfigsHelper helper;
+  auto env_options = helper.GetLiteRtEnvOptions(*model, *executor_settings);
+  EXPECT_EQ(env_options.size(), 1);
+  EXPECT_NE(helper.magic_number_configs(), nullptr);
+  EXPECT_EQ(helper.magic_number_configs()->num_configs, 5);
+
+  const auto& config0 = helper.magic_number_configs()->configs[0];
+  EXPECT_EQ(config0.magic_number, 8209);
+  EXPECT_EQ(config0.target_number, 1280);
+  EXPECT_EQ(config0.signature_prefix, nullptr);
+
+  const auto& config1 = helper.magic_number_configs()->configs[1];
+  EXPECT_EQ(config1.magic_number, 67);
+  EXPECT_EQ(config1.target_number, 64);
+  EXPECT_EQ(std::string(config1.signature_prefix), "prefill");
+
+  const auto& config2 = helper.magic_number_configs()->configs[2];
+  EXPECT_EQ(config2.magic_number, 257);
+  EXPECT_EQ(config2.target_number, 128);
+  EXPECT_EQ(std::string(config2.signature_prefix), "prefill");
+
+  const auto& config3 = helper.magic_number_configs()->configs[3];
+  EXPECT_EQ(config3.magic_number, 1031);
+  EXPECT_EQ(config3.target_number, 1024);
+  EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
+
+  const auto& config4 = helper.magic_number_configs()->configs[4];
+  EXPECT_EQ(config4.magic_number, 4099);
+  EXPECT_EQ(config4.target_number, 4096);
+  EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
+
+  // Verifications are disabled by default.
+  EXPECT_EQ(helper.magic_number_verifications(), nullptr);
+}
+
+TEST(MagicNumberConfigsHelperTest,
+     Multi_LessExplictSettings_LargerThanMagicNumbers) {
+  auto model = LoadModelFromFile(kTestModelPathMulti);
+  EXPECT_OK(model);
+  auto executor_settings = GetLlmExecutorSettings();
+  EXPECT_OK(executor_settings);
+  executor_settings->SetMaxNumTokens(1280);
+  AdvancedSettings advanced_settings{.prefill_batch_sizes = {512, 6144}};
+  executor_settings->SetAdvancedSettings(advanced_settings);
+
+  MagicNumberConfigsHelper helper;
+  auto env_options = helper.GetLiteRtEnvOptions(*model, *executor_settings);
+  EXPECT_EQ(env_options.size(), 1);
+  EXPECT_NE(helper.magic_number_configs(), nullptr);
+  EXPECT_EQ(helper.magic_number_configs()->num_configs, 5);
+
+  const auto& config0 = helper.magic_number_configs()->configs[0];
+  EXPECT_EQ(config0.magic_number, 8209);
+  EXPECT_EQ(config0.target_number, 1280);
+  EXPECT_EQ(config0.signature_prefix, nullptr);
+
+  const auto& config1 = helper.magic_number_configs()->configs[1];
+  EXPECT_EQ(config1.magic_number, 67);
+  EXPECT_EQ(config1.target_number, 64);
+  EXPECT_EQ(std::string(config1.signature_prefix), "prefill");
+
+  const auto& config2 = helper.magic_number_configs()->configs[2];
+  EXPECT_EQ(config2.magic_number, 257);
+  EXPECT_EQ(config2.target_number, 256);
+  EXPECT_EQ(std::string(config2.signature_prefix), "prefill");
+
+  const auto& config3 = helper.magic_number_configs()->configs[3];
+  EXPECT_EQ(config3.magic_number, 1031);
+  EXPECT_EQ(config3.target_number, 512);
+  EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
+
+  const auto& config4 = helper.magic_number_configs()->configs[4];
+  EXPECT_EQ(config4.magic_number, 4099);
+  EXPECT_EQ(config4.target_number, 4096);
+  EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
+
+  // Verifications are disabled by default.
+  EXPECT_EQ(helper.magic_number_verifications(), nullptr);
+}
+
+TEST(MagicNumberConfigsHelperTest, Multi_MoreExplictSettings) {
+  auto model = LoadModelFromFile(kTestModelPathMulti);
+  EXPECT_OK(model);
+  auto executor_settings = GetLlmExecutorSettings();
+  EXPECT_OK(executor_settings);
+  executor_settings->SetMaxNumTokens(3072);
+  AdvancedSettings advanced_settings{
+      .prefill_batch_sizes = {1024, 128, 2048, 32, 8}};
+  executor_settings->SetAdvancedSettings(advanced_settings);
+
+  MagicNumberConfigsHelper helper;
+  auto env_options = helper.GetLiteRtEnvOptions(*model, *executor_settings);
+  EXPECT_EQ(env_options.size(), 1);
+  EXPECT_NE(helper.magic_number_configs(), nullptr);
+  EXPECT_EQ(helper.magic_number_configs()->num_configs, 5);
+
+  // Since 5 batch sizes are given and 4 magic numbers are available, the first
+  // small batch size, 8, is skipped.
+  const auto& config0 = helper.magic_number_configs()->configs[0];
+  EXPECT_EQ(config0.magic_number, 8209);
+  EXPECT_EQ(config0.target_number, 3072);
+  EXPECT_EQ(config0.signature_prefix, nullptr);
+
+  const auto& config1 = helper.magic_number_configs()->configs[1];
+  EXPECT_EQ(config1.magic_number, 67);
+  EXPECT_EQ(config1.target_number, 32);
+  EXPECT_EQ(std::string(config1.signature_prefix), "prefill");
+
+  const auto& config2 = helper.magic_number_configs()->configs[2];
+  EXPECT_EQ(config2.magic_number, 257);
+  EXPECT_EQ(config2.target_number, 128);
+  EXPECT_EQ(std::string(config2.signature_prefix), "prefill");
+
+  const auto& config3 = helper.magic_number_configs()->configs[3];
+  EXPECT_EQ(config3.magic_number, 1031);
+  EXPECT_EQ(config3.target_number, 1024);
+  EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
+
+  const auto& config4 = helper.magic_number_configs()->configs[4];
+  EXPECT_EQ(config4.magic_number, 4099);
+  EXPECT_EQ(config4.target_number, 2048);
+  EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
+
+  // Verifications are disabled by default.
+  EXPECT_EQ(helper.magic_number_verifications(), nullptr);
+}
+
+TEST(MagicNumberConfigsHelperTest, Multi_MoreExplictSettings_SkipLast) {
+  auto model = LoadModelFromFile(kTestModelPathMulti);
+  EXPECT_OK(model);
+  auto executor_settings = GetLlmExecutorSettings();
+  EXPECT_OK(executor_settings);
+  executor_settings->SetMaxNumTokens(3072);
+  AdvancedSettings advanced_settings{
+      .prefill_batch_sizes = {1024, 128, 256, 512, 2048, 32}};
+  executor_settings->SetAdvancedSettings(advanced_settings);
+
+  MagicNumberConfigsHelper helper;
+  auto env_options = helper.GetLiteRtEnvOptions(*model, *executor_settings);
+  EXPECT_EQ(env_options.size(), 1);
+  EXPECT_NE(helper.magic_number_configs(), nullptr);
+  EXPECT_EQ(helper.magic_number_configs()->num_configs, 5);
+
+  const auto& config0 = helper.magic_number_configs()->configs[0];
+  EXPECT_EQ(config0.magic_number, 8209);
+  EXPECT_EQ(config0.target_number, 3072);
+  EXPECT_EQ(config0.signature_prefix, nullptr);
+
+  // Since 6 batch sizes are given and 4 magic numbers are available, the first
+  // 2 small batch sizes, 32, 128, are skipped and the first 256 doesn't fit in
+  // 67, the default target number 64 is used. The last 2048 is also skipped
+  // because no more magic numbers are available.
+  const auto& config1 = helper.magic_number_configs()->configs[1];
+  EXPECT_EQ(config1.magic_number, 67);
+  EXPECT_EQ(config1.target_number, 64);
+  EXPECT_EQ(std::string(config1.signature_prefix), "prefill");
+
+  const auto& config2 = helper.magic_number_configs()->configs[2];
+  EXPECT_EQ(config2.magic_number, 257);
+  EXPECT_EQ(config2.target_number, 256);
+  EXPECT_EQ(std::string(config2.signature_prefix), "prefill");
+
+  const auto& config3 = helper.magic_number_configs()->configs[3];
+  EXPECT_EQ(config3.magic_number, 1031);
+  EXPECT_EQ(config3.target_number, 512);
+  EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
+
+  const auto& config4 = helper.magic_number_configs()->configs[4];
+  EXPECT_EQ(config4.magic_number, 4099);
+  EXPECT_EQ(config4.target_number, 1024);
+  EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
+
+  // Verifications are disabled by default.
+  EXPECT_EQ(helper.magic_number_verifications(), nullptr);
+}
+
+TEST(MagicNumberConfigsHelperTest, Multi_LessExplictSettingsWithVerifications) {
+  auto model = LoadModelFromFile(kTestModelPathMulti);
+  EXPECT_OK(model);
+  auto executor_settings = GetLlmExecutorSettings();
+  EXPECT_OK(executor_settings);
+  executor_settings->SetMaxNumTokens(1280);
+  AdvancedSettings advanced_settings{.prefill_batch_sizes = {1024, 256},
+                                     .verify_magic_numbers = true};
+  executor_settings->SetAdvancedSettings(advanced_settings);
+
+  MagicNumberConfigsHelper helper;
+  auto env_options = helper.GetLiteRtEnvOptions(*model, *executor_settings);
+  EXPECT_EQ(env_options.size(), 2);
+  EXPECT_NE(helper.magic_number_configs(), nullptr);
+  EXPECT_EQ(helper.magic_number_configs()->num_configs, 5);
+
+  const auto& config0 = helper.magic_number_configs()->configs[0];
+  EXPECT_EQ(config0.magic_number, 8209);
+  EXPECT_EQ(config0.target_number, 1280);
+  EXPECT_EQ(config0.signature_prefix, nullptr);
+
+  const auto& config1 = helper.magic_number_configs()->configs[1];
+  EXPECT_EQ(config1.magic_number, 67);
+  EXPECT_EQ(config1.target_number, 64);
+  EXPECT_EQ(std::string(config1.signature_prefix), "prefill");
+
+  const auto& config2 = helper.magic_number_configs()->configs[2];
+  EXPECT_EQ(config2.magic_number, 257);
+  EXPECT_EQ(config2.target_number, 256);
+  EXPECT_EQ(std::string(config2.signature_prefix), "prefill");
+
+  const auto& config3 = helper.magic_number_configs()->configs[3];
+  EXPECT_EQ(config3.magic_number, 1031);
+  EXPECT_EQ(config3.target_number, 1024);
+  EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
+
+  const auto& config4 = helper.magic_number_configs()->configs[4];
+  EXPECT_EQ(config4.magic_number, 4099);
+  EXPECT_EQ(config4.target_number, 4096);
+  EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
+
+  EXPECT_NE(helper.magic_number_verifications(), nullptr);
+  EXPECT_EQ(helper.magic_number_verifications()->num_verifications, 3);
+
+  const auto& verification0 =
+      helper.magic_number_verifications()->verifications[0];
+  EXPECT_EQ(std::string(verification0.signature), "decode");
+  EXPECT_EQ(std::string(verification0.test_signature), "test_decode_1280");
+  EXPECT_EQ(verification0.is_superset, true);
+
+  const auto& verification1 =
+      helper.magic_number_verifications()->verifications[1];
+  EXPECT_EQ(std::string(verification1.signature), "prefill_1031");
+  EXPECT_EQ(std::string(verification1.test_signature), "test_prefill_1024");
+  EXPECT_EQ(verification1.is_superset, true);
+
+  const auto& verification2 =
+      helper.magic_number_verifications()->verifications[2];
+  EXPECT_EQ(std::string(verification2.signature), "prefill_257");
+  EXPECT_EQ(std::string(verification2.test_signature), "test_prefill_256");
+  EXPECT_EQ(verification2.is_superset, true);
+}
+
+TEST(MagicNumberConfigsHelperTest,
+     Multi_LessExplictSettingsWithVerifications_MatchedPartially) {
+  auto model = LoadModelFromFile(kTestModelPathMulti);
+  EXPECT_OK(model);
+  auto executor_settings = GetLlmExecutorSettings();
+  EXPECT_OK(executor_settings);
+  executor_settings->SetMaxNumTokens(1280);
+  AdvancedSettings advanced_settings{.prefill_batch_sizes = {1024, 128, 512},
+                                     .verify_magic_numbers = true};
+  executor_settings->SetAdvancedSettings(advanced_settings);
+
+  MagicNumberConfigsHelper helper;
+  auto env_options = helper.GetLiteRtEnvOptions(*model, *executor_settings);
+  EXPECT_EQ(env_options.size(), 2);
+  EXPECT_NE(helper.magic_number_configs(), nullptr);
+  EXPECT_EQ(helper.magic_number_configs()->num_configs, 5);
+
+  const auto& config0 = helper.magic_number_configs()->configs[0];
+  EXPECT_EQ(config0.magic_number, 8209);
+  EXPECT_EQ(config0.target_number, 1280);
+  EXPECT_EQ(config0.signature_prefix, nullptr);
+
+  const auto& config1 = helper.magic_number_configs()->configs[1];
+  EXPECT_EQ(config1.magic_number, 67);
+  EXPECT_EQ(config1.target_number, 64);
+  EXPECT_EQ(std::string(config1.signature_prefix), "prefill");
+
+  const auto& config2 = helper.magic_number_configs()->configs[2];
+  EXPECT_EQ(config2.magic_number, 257);
+  EXPECT_EQ(config2.target_number, 128);
+  EXPECT_EQ(std::string(config2.signature_prefix), "prefill");
+
+  const auto& config3 = helper.magic_number_configs()->configs[3];
+  EXPECT_EQ(config3.magic_number, 1031);
+  EXPECT_EQ(config3.target_number, 512);
+  EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
+
+  const auto& config4 = helper.magic_number_configs()->configs[4];
+  EXPECT_EQ(config4.magic_number, 4099);
+  EXPECT_EQ(config4.target_number, 1024);
+  EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
+
+  EXPECT_NE(helper.magic_number_verifications(), nullptr);
+  EXPECT_EQ(helper.magic_number_verifications()->num_verifications, 2);
+
+  const auto& verification0 =
+      helper.magic_number_verifications()->verifications[0];
+  EXPECT_EQ(std::string(verification0.signature), "decode");
+  EXPECT_EQ(std::string(verification0.test_signature), "test_decode_1280");
+  EXPECT_EQ(verification0.is_superset, true);
+
+  const auto& verification1 =
+      helper.magic_number_verifications()->verifications[1];
+  EXPECT_EQ(std::string(verification1.signature), "prefill_4099");
+  EXPECT_EQ(std::string(verification1.test_signature), "test_prefill_1024");
+  EXPECT_EQ(verification1.is_superset, true);
 }
 
 }  // namespace

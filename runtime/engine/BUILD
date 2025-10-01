@@ -156,7 +156,10 @@ cc_binary(
         "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/log:globals",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
         "@litert//litert/c:litert_logging",
+        "//runtime/util:litert_status_util",
     ],
 )
 
