@@ -455,9 +455,10 @@ TEST(MagicNumberConfigsHelperTest, Multi_LessExplictSettings) {
   EXPECT_EQ(config3.target_number, 1024);
   EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
 
+  // Last prefill_batch_size is capped by the context length, 1280.
   const auto& config4 = helper.magic_number_configs()->configs[4];
   EXPECT_EQ(config4.magic_number, 4099);
-  EXPECT_EQ(config4.target_number, 4096);
+  EXPECT_EQ(config4.target_number, 1280);
   EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
 
   // Verifications are disabled by default.
@@ -470,7 +471,7 @@ TEST(MagicNumberConfigsHelperTest,
   EXPECT_OK(model);
   auto executor_settings = GetLlmExecutorSettings();
   EXPECT_OK(executor_settings);
-  executor_settings->SetMaxNumTokens(1280);
+  executor_settings->SetMaxNumTokens(8192);
   AdvancedSettings advanced_settings{.prefill_batch_sizes = {512, 6144}};
   executor_settings->SetAdvancedSettings(advanced_settings);
 
@@ -482,7 +483,7 @@ TEST(MagicNumberConfigsHelperTest,
 
   const auto& config0 = helper.magic_number_configs()->configs[0];
   EXPECT_EQ(config0.magic_number, 8209);
-  EXPECT_EQ(config0.target_number, 1280);
+  EXPECT_EQ(config0.target_number, 8192);
   EXPECT_EQ(config0.signature_prefix, nullptr);
 
   const auto& config1 = helper.magic_number_configs()->configs[1];
@@ -605,6 +606,56 @@ TEST(MagicNumberConfigsHelperTest, Multi_MoreExplictSettings_SkipLast) {
   EXPECT_EQ(helper.magic_number_verifications(), nullptr);
 }
 
+TEST(MagicNumberConfigsHelperTest,
+     Multi_MoreExplictSettings_LargePrefillLengths) {
+  auto model = LoadModelFromFile(kTestModelPathMulti);
+  EXPECT_OK(model);
+  auto executor_settings = GetLlmExecutorSettings();
+  EXPECT_OK(executor_settings);
+  executor_settings->SetMaxNumTokens(256);
+  AdvancedSettings advanced_settings{
+      .prefill_batch_sizes = {1024, 64, 256, 512, 128}};
+  executor_settings->SetAdvancedSettings(advanced_settings);
+
+  MagicNumberConfigsHelper helper;
+  auto env_options = helper.GetLiteRtEnvOptions(*model, *executor_settings);
+  EXPECT_EQ(env_options.size(), 1);
+  EXPECT_NE(helper.magic_number_configs(), nullptr);
+  EXPECT_EQ(helper.magic_number_configs()->num_configs, 5);
+
+  const auto& config0 = helper.magic_number_configs()->configs[0];
+  EXPECT_EQ(config0.magic_number, 8209);
+  EXPECT_EQ(config0.target_number, 256);
+  EXPECT_EQ(config0.signature_prefix, nullptr);
+
+  // Since 6 batch sizes are given and 4 magic numbers are available, the first
+  // small batch size, 64 is skipped and the first 256 doesn't fit in 67, the
+  // default target number 64 is used. The last 2 lengths, 512, 1024 are larger
+  // than the context length 256, so they are also capped to 256.
+  const auto& config1 = helper.magic_number_configs()->configs[1];
+  EXPECT_EQ(config1.magic_number, 67);
+  EXPECT_EQ(config1.target_number, 64);
+  EXPECT_EQ(std::string(config1.signature_prefix), "prefill");
+
+  const auto& config2 = helper.magic_number_configs()->configs[2];
+  EXPECT_EQ(config2.magic_number, 257);
+  EXPECT_EQ(config2.target_number, 128);
+  EXPECT_EQ(std::string(config2.signature_prefix), "prefill");
+
+  const auto& config3 = helper.magic_number_configs()->configs[3];
+  EXPECT_EQ(config3.magic_number, 1031);
+  EXPECT_EQ(config3.target_number, 256);
+  EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
+
+  const auto& config4 = helper.magic_number_configs()->configs[4];
+  EXPECT_EQ(config4.magic_number, 4099);
+  EXPECT_EQ(config4.target_number, 256);
+  EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
+
+  // Verifications are disabled by default.
+  EXPECT_EQ(helper.magic_number_verifications(), nullptr);
+}
+
 TEST(MagicNumberConfigsHelperTest, Multi_LessExplictSettingsWithVerifications) {
   auto model = LoadModelFromFile(kTestModelPathMulti);
   EXPECT_OK(model);
@@ -641,9 +692,10 @@ TEST(MagicNumberConfigsHelperTest, Multi_LessExplictSettingsWithVerifications) {
   EXPECT_EQ(config3.target_number, 1024);
   EXPECT_EQ(std::string(config3.signature_prefix), "prefill");
 
+  // Last prefill_batch_size is capped by the context length, 1280.
   const auto& config4 = helper.magic_number_configs()->configs[4];
   EXPECT_EQ(config4.magic_number, 4099);
-  EXPECT_EQ(config4.target_number, 4096);
+  EXPECT_EQ(config4.target_number, 1280);
   EXPECT_EQ(std::string(config4.signature_prefix), "prefill");
 
   EXPECT_NE(helper.magic_number_verifications(), nullptr);

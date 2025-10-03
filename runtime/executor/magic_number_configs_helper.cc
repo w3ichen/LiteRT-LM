@@ -280,14 +280,20 @@ std::vector<Environment::Option> MagicNumberConfigsHelper::GetLiteRtEnvOptions(
     for (auto magic_number : magic_numbers->prefill_lengths) {
       // Fill with default target numbers until the magic number is larger than
       // or equal to the prefill batch size.
+      int64_t target_prefill_number = 0;
       if (it_prefill == advanced_settings.prefill_batch_sizes.end() ||
           *it_prefill > magic_number) {
-        target_numbers.prefill_lengths.push_back(
-            GetDefaultTargetNumber(magic_number));
+        target_prefill_number = GetDefaultTargetNumber(magic_number);
       } else {
-        target_numbers.prefill_lengths.push_back(*it_prefill);
+        target_prefill_number = *it_prefill;
         ++it_prefill;
       }
+      // Target prefill length must not be longer than context length.
+      if (target_numbers.context_length > 0 &&
+          target_prefill_number > target_numbers.context_length) {
+        target_prefill_number = target_numbers.context_length;
+      }
+      target_numbers.prefill_lengths.push_back(target_prefill_number);
     }
 
     if (it_prefill != advanced_settings.prefill_batch_sizes.end()) {
