@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
+#include "runtime/components/prompt_template.h"
 #include "runtime/components/tokenizer.h"
 #include "runtime/proto/llm_metadata.pb.h"
 #include "runtime/proto/llm_model_type.pb.h"
@@ -88,6 +89,93 @@ TEST(ModelTypeUtilsTest, InferLlmModelTypeGenericModel) {
   ASSERT_OK_AND_ASSIGN(auto model_type,
                        InferLlmModelType(proto::LlmMetadata(), tokenizer));
   EXPECT_THAT(model_type.has_generic_model(), true);
+}
+
+TEST(ModelTypeUtilsTest, GetDefaultJinjaPromptTemplate) {
+  proto::PromptTemplates prompt_templates;
+  prompt_templates.mutable_user()->set_prefix("<start_of_turn>user\n");
+  prompt_templates.mutable_model()->set_prefix("<start_of_turn>model\n");
+  prompt_templates.mutable_system()->set_prefix("<start_of_turn>system\n");
+  prompt_templates.mutable_user()->set_suffix("<end_of_turn>\n");
+  prompt_templates.mutable_model()->set_suffix("<end_of_turn>\n");
+  prompt_templates.mutable_system()->set_suffix("<end_of_turn>\n");
+  proto::LlmModelType llm_model_type;
+  llm_model_type.mutable_generic_model();
+  ASSERT_OK_AND_ASSIGN(
+      auto jinja_prompt_template,
+      GetDefaultJinjaPromptTemplate(prompt_templates, llm_model_type));
+  PromptTemplate prompt_template(jinja_prompt_template);
+  PromptTemplateInput prompt_template_input;
+  prompt_template_input.messages = {
+      {{"role", "system"}, {"content", "This is a system message"}},
+      {{"role", "user"}, {"content", "This is a user message"}},
+      {{"role", "model"}, {"content", "This is a model message"}}};
+  ASSERT_OK_AND_ASSIGN(auto rendered_prompt,
+                       prompt_template.Apply(prompt_template_input));
+  EXPECT_EQ(rendered_prompt,
+            "<start_of_turn>system\nThis is a system message<end_of_turn>\n"
+            "<start_of_turn>user\nThis is a user message<end_of_turn>\n"
+            "<start_of_turn>model\nThis is a model message<end_of_turn>\n"
+            "<start_of_turn>model\n");
+}
+
+TEST(ModelTypeUtilsTest, GetDefaultJinjaPromptTemplateEmpty) {
+  proto::PromptTemplates prompt_templates;
+  proto::LlmModelType llm_model_type;
+  llm_model_type.mutable_generic_model();
+  ASSERT_OK_AND_ASSIGN(
+      auto jinja_prompt_template,
+      GetDefaultJinjaPromptTemplate(prompt_templates, llm_model_type));
+  PromptTemplate prompt_template(jinja_prompt_template);
+  PromptTemplateInput prompt_template_input;
+  prompt_template_input.messages = {
+      {{"role", "system"}, {"content", "This is a system message"}},
+      {{"role", "user"}, {"content", "This is a user message"}},
+      {{"role", "model"}, {"content", "This is a model message"}}};
+  ASSERT_OK_AND_ASSIGN(auto rendered_prompt,
+                       prompt_template.Apply(prompt_template_input));
+  EXPECT_EQ(rendered_prompt,
+            "This is a system message"
+            "This is a user message"
+            "This is a model message");
+}
+
+TEST(ModelTypeUtilsTest, GetDefaultJinjaPromptTemplateWithImageAndAudio) {
+  proto::PromptTemplates prompt_templates;
+  prompt_templates.mutable_user()->set_prefix("<start_of_turn>user\n");
+  prompt_templates.mutable_model()->set_prefix("<start_of_turn>model\n");
+  prompt_templates.mutable_system()->set_prefix("<start_of_turn>system\n");
+  prompt_templates.mutable_user()->set_suffix("<end_of_turn>\n");
+  prompt_templates.mutable_model()->set_suffix("<end_of_turn>\n");
+  prompt_templates.mutable_system()->set_suffix("<end_of_turn>\n");
+  proto::LlmModelType llm_model_type;
+  llm_model_type.mutable_generic_model();
+  ASSERT_OK_AND_ASSIGN(
+      auto jinja_prompt_template,
+      GetDefaultJinjaPromptTemplate(prompt_templates, llm_model_type));
+  PromptTemplate prompt_template(jinja_prompt_template);
+  PromptTemplateInput prompt_template_input;
+  prompt_template_input.messages = {
+      {{"role", "system"}, {"content", "This is a system message"}},
+      {
+          {"role", "user"},
+          {"content",
+           {
+               {{"type", "text"}, {"text", "Here is a user image "}},
+               {{"type", "image"}, {"image", "image_bytes"}},
+               {{"type", "text"}, {"text", " Here is a user audio "}},
+               {{"type", "audio"}, {"audio", "audio_bytes"}},
+           }},
+      },
+      {{"role", "model"}, {"content", "This is a model message"}}};
+  ASSERT_OK_AND_ASSIGN(auto rendered_prompt,
+                       prompt_template.Apply(prompt_template_input));
+  EXPECT_EQ(rendered_prompt,
+            "<start_of_turn>system\nThis is a system message<end_of_turn>\n"
+            "<start_of_turn>user\nHere is a user image <start_of_image> Here "
+            "is a user audio <start_of_audio><end_of_turn>\n"
+            "<start_of_turn>model\nThis is a model message<end_of_turn>\n"
+            "<start_of_turn>model\n");
 }
 
 }  // namespace

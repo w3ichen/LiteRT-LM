@@ -16,6 +16,7 @@
 
 #include <optional>
 #include <ostream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -174,6 +175,11 @@ absl::Status EngineSettings::MaybeUpdateAndValidate(
   if (!metadata.has_llm_model_type()) {
     ASSIGN_OR_RETURN(*metadata.mutable_llm_model_type(),
                      InferLlmModelType(metadata, tokenizer));
+  }
+  if (!metadata.has_jinja_prompt_template()) {
+    ASSIGN_OR_RETURN(*metadata.mutable_jinja_prompt_template(),
+                     GetDefaultJinjaPromptTemplate(metadata.prompt_templates(),
+                                                   metadata.llm_model_type()));
   }
 
   ABSL_LOG(INFO) << "The llm metadata: " << metadata.DebugString();
@@ -339,6 +345,7 @@ absl::Status SessionConfig::MaybeUpdateAndValidate(
     }
 
     llm_model_type_ = llm_metadata.llm_model_type();
+    jinja_prompt_template_ = llm_metadata.jinja_prompt_template();
   }
 
   // Validating the required fields are set correctly.
@@ -421,6 +428,14 @@ proto::LlmModelType& SessionConfig::GetMutableLlmModelType() {
   return llm_model_type_;
 }
 
+const std::string& SessionConfig::GetJinjaPromptTemplate() const {
+  return jinja_prompt_template_;
+}
+
+std::string& SessionConfig::GetMutableJinjaPromptTemplate() {
+  return jinja_prompt_template_;
+}
+
 std::ostream& operator<<(std::ostream& os, const SessionConfig& config) {
   os << "SessionConfig: " << std::endl;
   os << "  SamplerParams: " << config.GetSamplerParams().DebugString()
@@ -436,6 +451,8 @@ std::ostream& operator<<(std::ostream& os, const SessionConfig& config) {
   os << "  PromptTemplates: " << config.GetPromptTemplates().DebugString()
      << std::endl;
   os << "  LlmModelType: " << config.GetLlmModelType().DebugString()
+     << std::endl;
+  os << "  JinjaPromptTemplate: " << config.GetJinjaPromptTemplate()
      << std::endl;
   return os;
 }

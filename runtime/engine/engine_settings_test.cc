@@ -611,6 +611,52 @@ TEST(SessionConfigTest, MaybeUpdateAndValidateLlmGemma3) {
             proto::LlmModelType::kGemma3);
 }
 
+// Check the Jinja prompt template is set from the deprecated prompt template
+// field.
+TEST(SessionConfigTest, MaybeUpdateAndValidateJinjaPromptTemplate) {
+  auto model_assets = ModelAssets::Create("test_model_path_1");
+  ASSERT_OK(model_assets);
+  auto settings = EngineSettings::CreateDefault(*model_assets);
+  auto session_config = SessionConfig::CreateDefault();
+  EXPECT_OK(settings);
+
+  MockTokenizer tokenizer;
+  EXPECT_CALL(tokenizer, BosId()).WillRepeatedly(Return(2));
+  EXPECT_CALL(tokenizer, EosId()).WillRepeatedly(Return(1));
+  EXPECT_CALL(tokenizer, TokenIdsToText).WillRepeatedly(Return("fake_text"));
+  EXPECT_CALL(tokenizer, TextToTokenIds)
+      .WillRepeatedly(Return(std::vector<int>{1}));
+  proto::LlmMetadata llm_metadata = CreateLlmMetadata();
+  EXPECT_OK(settings->MaybeUpdateAndValidate(tokenizer, &llm_metadata));
+
+  EXPECT_OK(session_config.MaybeUpdateAndValidate(*settings));
+  // The Jinja prompt template should not contain "<start_of_turn>" because the
+  // template proto is not set.
+  EXPECT_THAT(session_config.GetJinjaPromptTemplate(),
+              testing::Not(testing::HasSubstr("<start_of_turn>user\n")));
+  EXPECT_THAT(session_config.GetJinjaPromptTemplate(),
+              testing::Not(testing::HasSubstr("<start_of_turn>model\n")));
+  EXPECT_THAT(session_config.GetJinjaPromptTemplate(),
+              testing::Not(testing::HasSubstr("<start_of_turn>system\n")));
+
+  // Set the prompt template in the llm metadata. This should be used to
+  // generate the Jinja prompt template.
+  llm_metadata.mutable_prompt_templates()->mutable_user()->set_prefix(
+      "<start_of_turn>user\n");
+  llm_metadata.mutable_prompt_templates()->mutable_model()->set_prefix(
+      "<start_of_turn>model\n");
+  llm_metadata.mutable_prompt_templates()->mutable_system()->set_prefix(
+      "<start_of_turn>system\n");
+  EXPECT_OK(settings->MaybeUpdateAndValidate(tokenizer, &llm_metadata));
+  EXPECT_OK(session_config.MaybeUpdateAndValidate(*settings));
+  EXPECT_THAT(session_config.GetJinjaPromptTemplate(),
+              testing::HasSubstr("<start_of_turn>user\n"));
+  EXPECT_THAT(session_config.GetJinjaPromptTemplate(),
+              testing::HasSubstr("<start_of_turn>model\n"));
+  EXPECT_THAT(session_config.GetJinjaPromptTemplate(),
+              testing::HasSubstr("<start_of_turn>system\n"));
+}
+
 TEST(SessionConfigTest, PrintOperator) {
   SessionConfig session_config = SessionConfig::CreateDefault();
   session_config.GetMutableSamplerParams().set_type(

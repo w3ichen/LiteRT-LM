@@ -42,25 +42,6 @@
 #include "runtime/util/status_macros.h"
 
 namespace litert::lm {
-namespace {
-
-// TODO - b/439648399: remove this default template once the the template logic
-// in session is removed.
-constexpr absl::string_view kDefaultTemplate =
-    R"tmpl(
-{%- for message in messages -%}
-  {%- if message.content is string -%}
-        {{ message.content }}
-  {%- else -%}
-    {%- for content in message.content %}
-        {%- if content.text is string -%}
-          {{ content.text }}
-        {%- endif -%}
-      {%- endfor -%}
-  {%- endif -%}
-{%- endfor -%})tmpl";
-
-}  // namespace
 
 absl::StatusOr<std::string> Conversation::GetSingleTurnText(
     const Message& message) const {
@@ -150,11 +131,12 @@ absl::StatusOr<std::unique_ptr<Conversation>> Conversation::Create(
       std::unique_ptr<ModelDataProcessor> model_data_processor,
       CreateModelDataProcessor(llm_model_type, *processor_config, *preface));
   if (!prompt_template.has_value()) {
-    // TODO: b/439648399 - get template from the session or model file when the
-    // template is not provided by the user.
+    // Get template from the session or model file when the template is not
+    // provided by the user.
     ABSL_LOG(INFO)
         << "Prompt template is not provided, using default template.";
-    prompt_template = PromptTemplate(kDefaultTemplate);
+    prompt_template =
+        PromptTemplate(session->GetSessionConfig().GetJinjaPromptTemplate());
   }
   auto conversation = absl::WrapUnique(
       new Conversation(std::move(session), std::move(model_data_processor),

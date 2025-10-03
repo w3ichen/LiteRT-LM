@@ -15,9 +15,13 @@
 #include "runtime/util/model_type_utils.h"
 
 #include <array>
+#include <string>
 #include <vector>
 
+#include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
+#include "absl/strings/str_cat.h"  // from @com_google_absl
+#include "absl/strings/substitute.h"  // from @com_google_absl
 #include "runtime/components/tokenizer.h"
 #include "runtime/proto/llm_metadata.pb.h"
 #include "runtime/proto/llm_model_type.pb.h"
@@ -69,6 +73,74 @@ absl::StatusOr<proto::LlmModelType> InferLlmModelType(
     }
   }
   return model_type;
+}
+
+absl::StatusOr<std::string> GetDefaultJinjaPromptTemplate(
+    const proto::PromptTemplates& prompt_templates,
+    const proto::LlmModelType& llm_model_type) {
+  switch (llm_model_type.model_type_case()) {
+    case proto::LlmModelType::kGemma3N:
+    case proto::LlmModelType::kGemma3:
+    case proto::LlmModelType::kGenericModel:
+      // absl::Substitute takes up to 10 arguments, so we have to split the
+      // template into two parts.
+      return absl::StrCat(
+          absl::Substitute("{%- for message in messages -%}"
+                           "{%- if message.content is string -%}"
+                           "{%- if message.role == 'user' %}"
+                           "$0{{ message.content }}$1"
+                           "{% endif -%}"
+                           "{%- if message.role == 'model' %}"
+                           "$2{{ message.content }}$3"
+                           "{% endif -%}"
+                           "{%- if message.role == 'system' %}"
+                           "$4{{ message.content }}$5"
+                           "{% endif -%}"
+                           "{%- else -%}",
+                           prompt_templates.user().prefix(),
+                           prompt_templates.user().suffix(),
+                           prompt_templates.model().prefix(),
+                           prompt_templates.model().suffix(),
+                           prompt_templates.system().prefix(),
+                           prompt_templates.system().suffix()),
+          absl::Substitute("{%- if message.role == 'user' %}"
+                           "$0"
+                           "{% elif message.role == 'model' %}"
+                           "$1"
+                           "{% elif message.role == 'system' %}"
+                           "$2"
+                           "{% endif -%}"
+                           "{%- for item in message.content %}"
+                           "{%- if item.type == 'text' %}"
+                           "{{ item.text }}"
+                           "{% elif item.type == 'image' -%}"
+                           "{{ '<start_of_image>' }}"
+                           "{%- elif item.type == 'audio' -%}"
+                           "{{ '<start_of_audio>' }}"
+                           "{%- endif -%}"
+                           "{%- endfor -%}"
+                           "{%- if message.role == 'user' %}"
+                           "$3"
+                           "{% elif message.role == 'model' %}"
+                           "$4"
+                           "{% elif message.role == 'system' %}"
+                           "$5"
+                           "{% endif -%}"
+                           "{%- endif -%}"
+                           "{%- endfor -%}"
+                           "{%- if add_generation_prompt %}"
+                           "$6"
+                           "{% endif -%}",
+                           prompt_templates.user().prefix(),
+                           prompt_templates.model().prefix(),
+                           prompt_templates.system().prefix(),
+                           prompt_templates.user().suffix(),
+                           prompt_templates.model().suffix(),
+                           prompt_templates.system().suffix(),
+                           prompt_templates.model().prefix()));
+    case proto::LlmModelType::MODEL_TYPE_NOT_SET:
+      return absl::InvalidArgumentError("LlmModelType is not set.");
+  }
 }
 
 }  // namespace litert::lm

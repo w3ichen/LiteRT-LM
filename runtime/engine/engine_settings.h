@@ -17,6 +17,7 @@
 
 #include <optional>
 #include <ostream>
+#include <string>
 #include <vector>
 
 #include "absl/base/nullability.h"  // from @com_google_absl
@@ -177,13 +178,21 @@ class SessionConfig {
 
   // Prompt templates:
   // Getters for the prompt templates.
+
+  [[deprecated("Use Jinja prompt template instead.")]]
   const proto::PromptTemplates& GetPromptTemplates() const;
+  [[deprecated("Use Jinja prompt template instead.")]]
   proto::PromptTemplates& GetMutablePromptTemplates();
 
   // Llm model type:
   // Getters for the LLM model type.
   const proto::LlmModelType& GetLlmModelType() const;
   proto::LlmModelType& GetMutableLlmModelType();
+
+  // Jinja prompt template:
+  // Getters for the jinja prompt template.
+  const std::string& GetJinjaPromptTemplate() const;
+  std::string& GetMutableJinjaPromptTemplate();
 
  private:
   // Private constructor for the SessionConfig. The user should use the
@@ -209,6 +218,9 @@ class SessionConfig {
   // Llm model type for the session. This is loaded from the model assets (if
   // present).
   proto::LlmModelType llm_model_type_;
+
+  // Jinja prompt template for the session.
+  std::string jinja_prompt_template_;
 
   // The number of output candidates to generate. Default value is 1 and setting
   // it to a value greater than 1 will require the model to support batching.
