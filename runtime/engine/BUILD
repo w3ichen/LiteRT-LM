@@ -112,10 +112,17 @@ cc_library(
         "//runtime/util:litert_status_util",
         "@com_googlesource_code_re2//:re2",
         "@stb//:stb_image",
+        "@litert//tflite/profiling:memory_info",
         "@litert//tflite/profiling:memory_usage_monitor",
     ] + select({
         "//conditions:default": ["//runtime/core:engine_impl"],
-    }),
+    }) + select(
+        {
+            "@platforms//os:linux": [
+            ],
+            "//conditions:default": [],
+        },
+    ),
 )
 
 cc_binary(

@@ -49,6 +49,7 @@
 #include "runtime/util/status_macros.h"  // IWYU pragma: keep
 #include "re2/re2.h"  // from @com_googlesource_code_re2
 #include "stb_image.h"  // from @stb
+#include "tflite/profiling/memory_info.h"  // from @litert
 #include "tflite/profiling/memory_usage_monitor.h"  // from @litert
 
 namespace litert {
@@ -186,6 +187,7 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
   if (model_path.empty()) {
     return absl::InvalidArgumentError("Model path is empty.");
   }
+
   std::unique_ptr<tflite::profiling::memory::MemoryUsageMonitor> mem_monitor;
   if (settings.report_peak_memory_footprint) {
     mem_monitor =
@@ -370,6 +372,10 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
                   images_bytes, audio_bytes);
   }
 
+  // Manually releasing the session to ensure that memory usage from
+  // `GetMemoryUsage()` is reporting idle engine state without active sessions.
+  session->release();
+
   if (settings.report_peak_memory_footprint) {
     float peak_mem_mb = 0.0f;
     if (mem_monitor != nullptr) {
@@ -377,7 +383,10 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
       peak_mem_mb = mem_monitor->GetPeakMemUsageInMB();
     }
     ABSL_LOG(INFO) << "Peak system ram usage: " << peak_mem_mb << "MB.";
+    ABSL_LOG(INFO) << "Memory usage: "
+                   << tflite::profiling::memory::GetMemoryUsage();
   }
+
   return absl::OkStatus();
 }
 

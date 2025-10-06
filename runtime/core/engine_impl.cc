@@ -179,7 +179,17 @@ absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
     return absl::InvalidArgumentError(
         absl::StrCat("Not supported file format: ", file_format));
   }
+
+  if (benchmark_info.has_value()) {
+    RETURN_IF_ERROR(
+        benchmark_info->TimeInitPhaseStart("Tokenizer initialization"));
+  }
   ASSIGN_OR_RETURN(auto* tokenizer, model_resources->GetTokenizer());
+  if (benchmark_info.has_value()) {
+    RETURN_IF_ERROR(
+        benchmark_info->TimeInitPhaseEnd("Tokenizer initialization"));
+  }
+
   ASSIGN_OR_RETURN(auto* llm_metadata, model_resources->GetLlmMetadata());
 
   // Update and load the parameters from the model file and convert the
@@ -250,13 +260,6 @@ absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
   if (benchmark_info.has_value()) {
     RETURN_IF_ERROR(
         benchmark_info->TimeInitPhaseEnd("Executor initialization"));
-    RETURN_IF_ERROR(
-        benchmark_info->TimeInitPhaseStart("Tokenizer initialization"));
-  }
-
-  if (benchmark_info.has_value()) {
-    RETURN_IF_ERROR(
-        benchmark_info->TimeInitPhaseEnd("Tokenizer initialization"));
   }
 
   // Creating the thread pool of a single thread to execute the works.

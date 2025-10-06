@@ -209,6 +209,10 @@ absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
     ASSIGN_OR_RETURN(auto scoped_file, ScopedFile::Open(model_path));
     ASSIGN_OR_RETURN(auto resources, ModelAssetBundleResources::Create(
                                          /*tag=*/"", std::move(scoped_file)));
+    if (benchmark_info.has_value()) {
+      RETURN_IF_ERROR(
+          benchmark_info->TimeInitPhaseStart("Tokenizer initialization"));
+    }
     ASSIGN_OR_RETURN(auto vocab_buffer, resources->GetFile("TOKENIZER_MODEL"));
     ASSIGN_OR_RETURN(task_tokenizer,
                      SentencePieceTokenizer::CreateFromBuffer(vocab_buffer));
@@ -273,8 +277,6 @@ absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
   if (benchmark_info.has_value()) {
     RETURN_IF_ERROR(
         benchmark_info->TimeInitPhaseEnd("Executor initialization"));
-    RETURN_IF_ERROR(
-        benchmark_info->TimeInitPhaseStart("Tokenizer initialization"));
   }
 
   RuntimeConfig runtime_config;
