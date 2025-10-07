@@ -48,7 +48,6 @@
 #include "runtime/executor/llm_executor_settings.h"
 #include "runtime/util/status_macros.h"  // IWYU pragma: keep
 #include "re2/re2.h"  // from @com_googlesource_code_re2
-#include "stb_image.h"  // from @stb
 #include "tflite/profiling/memory_info.h"  // from @litert
 #include "tflite/profiling/memory_usage_monitor.h"  // from @litert
 
