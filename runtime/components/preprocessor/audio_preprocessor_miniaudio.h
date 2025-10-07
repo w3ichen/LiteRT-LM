@@ -65,11 +65,19 @@ class AudioPreprocessorMiniAudio : public AudioPreprocessor {
   //   with shape (1, num_frames, num_mel_bins).
   absl::StatusOr<InputAudio> Preprocess(const InputAudio& input_audio) override;
 
+  // Resets the preprocessor to its initial state.
+  void Reset() override {
+    input_queue_.clear();
+    samples_to_next_step_ = config_.GetFrameLength();
+  }
+
  private:
   explicit AudioPreprocessorMiniAudio(
       const AudioPreprocessorConfig& config,
       std::unique_ptr<MelFilterbank> mel_filterbank)
-      : config_(config), mel_filterbank_(std::move(mel_filterbank)) {
+      : config_(config),
+        mel_filterbank_(std::move(mel_filterbank)),
+        input_queue_(std::vector<float>()) {
     samples_to_next_step_ = config_.GetFrameLength();
   }
 

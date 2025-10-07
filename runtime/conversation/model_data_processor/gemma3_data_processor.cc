@@ -200,6 +200,7 @@ Gemma3DataProcessor::ToInputDataVectorImpl(
                        audio_preprocessor_->Preprocess(InputAudio(std::string(
                            static_cast<const char*>(audio_file->data()),
                            audio_file->length()))));
+      audio_preprocessor_->Reset();
       input_data.emplace_back(InputAudio(std::move(preprocessed_audio)));
     }
   }

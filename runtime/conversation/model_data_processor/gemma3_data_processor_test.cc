@@ -736,7 +736,8 @@ TEST(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextAndAudio) {
        {"content", "I am doing well, thanks for asking."}},
       {{"role", "user"},
        {"content",
-        {{{"type", "text"}, {"text", "What is the capital of France?"}}}}}};
+        {{{"type", "audio"}, {"path", audio_path}},
+         {{"type", "text"}, {"text", "What is the capital of France?"}}}}}};
   PromptTemplateInput template_input = {.messages = messages,
                                         .add_generation_prompt = true};
 
@@ -761,12 +762,15 @@ How are you?<start_of_audio>)""");
 <start_of_turn>model
 I am doing well, thanks for asking.<end_of_turn>
 <start_of_turn>user
-What is the capital of France?<end_of_turn>
+<start_of_audio>)""");
+  InputText expected_text3(R"""(What is the capital of France?<end_of_turn>
 <start_of_turn>model
 )""");
-  EXPECT_THAT(input_data, ElementsAre(HasInputText(&expected_text1),
-                                      HasInputAudio(&expected_audio),
-                                      HasInputText(&expected_text2)));
+  EXPECT_THAT(
+      input_data,
+      ElementsAre(HasInputText(&expected_text1), HasInputAudio(&expected_audio),
+                  HasInputText(&expected_text2), HasInputAudio(&expected_audio),
+                  HasInputText(&expected_text3)));
 }
 
 #endif  // !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32__) &&

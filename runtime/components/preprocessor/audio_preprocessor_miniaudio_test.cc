@@ -247,6 +247,74 @@ TEST(AudioPreprocessorMiniAudioTest, UsmPreprocessing) {
                 5e-4);
   }
 }
+
+TEST(AudioPreprocessorMiniAudioTest, UsmPreprocessingTwice) {
+  AudioPreprocessorConfig config =
+      AudioPreprocessorConfig::CreateDefaultUsmConfig();
+  ASSERT_OK_AND_ASSIGN(auto raw_audio_data, GetRawAudioData());
+  std::vector<float> pcm_frames;
+  ASSERT_OK(AudioPreprocessorMiniAudio::DecodeAudio(
+      raw_audio_data, config.GetNumChannels(), config.GetSampleRateHz(),
+      pcm_frames));
+
+  // Ground truth from TFLite weightless USM frontend model.
+  ASSERT_OK_AND_ASSIGN(auto frontend_model,
+                       FrontendModelWrapper::Create(kFrontendModelPath));
+  std::vector<float> frontend_mel_spectrogram;
+  std::vector<uint8_t> frontend_mask;
+  ASSERT_OK(frontend_model->Run(pcm_frames, &frontend_mel_spectrogram,
+                                &frontend_mask));
+  int true_count = 0;
+  for (int i = 0; i < frontend_mask.size(); ++i) {
+    if (frontend_mask[i] == 1) {
+      true_count++;
+    }
+  }
+  frontend_mel_spectrogram.resize(true_count * config.GetNumMelBins());
+
+  // Create MiniAudio preprocessor.
+  ASSERT_OK_AND_ASSIGN(auto preprocessor,
+                       AudioPreprocessorMiniAudio::Create(config));
+  ASSERT_OK_AND_ASSIGN(auto preprocessed_audio,
+                       preprocessor->Preprocess(InputAudio(raw_audio_data)));
+  ASSERT_OK_AND_ASSIGN(auto preprocessed_mel_spectrogram_tensor,
+                       preprocessed_audio.GetPreprocessedAudioTensor());
+  ASSERT_OK_AND_ASSIGN(
+      auto preprocessed_mel_spectrogram,
+      GetDataAsVector<float>(*preprocessed_mel_spectrogram_tensor));
+
+  ASSERT_EQ(preprocessed_mel_spectrogram.size(),
+            frontend_mel_spectrogram.size());
+  for (int i = 0; i < preprocessed_mel_spectrogram.size(); ++i) {
+    EXPECT_NEAR(preprocessed_mel_spectrogram[i], frontend_mel_spectrogram[i],
+                5e-4);
+  }
+
+  // Preprocess the same audio data again without resetting the preprocessor.
+  auto result = preprocessor->Preprocess(InputAudio(raw_audio_data));
+  EXPECT_THAT(result, testing::status::StatusIs(absl::StatusCode::kInternal));
+  EXPECT_THAT(
+      result.status().message(),
+      testing::HasSubstr(
+          "Windowed signals size is not equal to expected number of frames"));
+
+  // Preprocess the same audio data again after resetting the preprocessor.
+  preprocessor->Reset();
+  ASSERT_OK_AND_ASSIGN(preprocessed_audio,
+                       preprocessor->Preprocess(InputAudio(raw_audio_data)));
+  ASSERT_OK_AND_ASSIGN(preprocessed_mel_spectrogram_tensor,
+                       preprocessed_audio.GetPreprocessedAudioTensor());
+  ASSERT_OK_AND_ASSIGN(
+      preprocessed_mel_spectrogram,
+      GetDataAsVector<float>(*preprocessed_mel_spectrogram_tensor));
+  ASSERT_EQ(preprocessed_mel_spectrogram.size(),
+            frontend_mel_spectrogram.size());
+  for (int i = 0; i < preprocessed_mel_spectrogram.size(); ++i) {
+    EXPECT_NEAR(preprocessed_mel_spectrogram[i], frontend_mel_spectrogram[i],
+                5e-4);
+  }
+}
+
 #endif  // !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32__) &&
         // !defined(__NT__) && !defined(_WIN64)
 

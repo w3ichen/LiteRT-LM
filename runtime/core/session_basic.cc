@@ -455,6 +455,7 @@ absl::StatusOr<std::vector<InputData>> SessionBasic::PreprocessContents(
         }
         ASSIGN_OR_RETURN(auto preprocessed_audio,
                          audio_preprocessor_->Preprocess(*input_audio));
+        audio_preprocessor_->Reset();
         preprocessed_contents.emplace_back(
             InputAudio(std::move(preprocessed_audio)));
       }

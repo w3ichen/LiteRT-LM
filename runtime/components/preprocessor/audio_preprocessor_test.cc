@@ -41,6 +41,7 @@ class MockAudioPreprocessor : public AudioPreprocessor {
  public:
   MOCK_METHOD(absl::StatusOr<InputAudio>, Preprocess,
               (const InputAudio& input_audio), (override));
+  MOCK_METHOD(void, Reset, (), (override));
 };
 
 TEST(AudioPreprocessorTest, Preprocess) {

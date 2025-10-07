@@ -43,6 +43,9 @@ class ByPassAudioPreprocessor : public AudioPreprocessor {
     }
     return absl::InvalidArgumentError("Input audio is not preprocessed.");
   };
+
+  // No-op for bypass preprocessor.
+  void Reset() override {}
 };
 
 }  // namespace litert::lm

@@ -257,6 +257,9 @@ class AudioPreprocessor {
   // Preprocesses the undecoded audio bytes and returns the preprocessed audio.
   virtual absl::StatusOr<InputAudio> Preprocess(
       const InputAudio& input_audio) = 0;
+
+  // Reset the audio preprocessor to the initial state.
+  virtual void Reset() = 0;
 };
 
 }  // namespace litert::lm
