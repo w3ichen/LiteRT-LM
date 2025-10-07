@@ -417,6 +417,8 @@ TEST_F(PipelineCustomSamplingTest,
       /*vocab_size=*/2560, prefill_tokens, decode_tokens, /*batch_size=*/2);
 
   auto decoded_ids = CreateTensorBuffer<int>({2, 1});
+  // Populate with the last pre-filled token.
+  decoded_ids->Write<int>({224, 224});
   std::optional<BenchmarkInfo> benchmark_info;
   StopTokenDetector stop_token_detector(2);
   EXPECT_OK(stop_token_detector.AddStopTokenSequence({0}));
@@ -426,9 +428,7 @@ TEST_F(PipelineCustomSamplingTest,
       /*constraint=*/std::make_optional(constraint.get()), benchmark_info);
   EXPECT_OK(responses);
   EXPECT_EQ(responses->GetNumOutputCandidates(), 2);
-  // First candidate: " How's it going?!".
   EXPECT_EQ(*(responses->GetResponseTextAt(0)), " How's it");
-  // Second candidate: " Hello World!".
   EXPECT_EQ(*(responses->GetResponseTextAt(1)), " How's it");
 }
 
@@ -667,6 +667,8 @@ TEST_F(PipelineCustomSamplingTest,
   std::unique_ptr<TopPSampler> sampler = std::move(sampler_or.value());
 
   auto decoded_ids = CreateTensorBuffer<int>({2, 1});
+  // Populate with the last pre-filled token.
+  decoded_ids->Write<int>({2, 2});
   absl::Status callbacks_status;
   std::vector<std::string> responses(2);
   bool done = false;
