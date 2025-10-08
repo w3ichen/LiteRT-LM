@@ -44,10 +44,10 @@ struct LiteRtLmSettings {
   bool force_f32 = false;
   bool multi_turns = false;
   int num_cpu_threads = 0;
-  // Set no external tensor mode true by default since it runs slightly faster
+  // Set external tensor mode false by default since it runs slightly faster
   // during decode as the layout changes optimized for GPU inference is done by
   // GPU, not by CPU.
-  bool gpu_no_external_tensor_mode = true;
+  bool gpu_external_tensor_mode = false;
   bool configure_magic_numbers = true;
   bool verify_magic_numbers = false;
   bool clear_kv_cache_before_prefill = false;

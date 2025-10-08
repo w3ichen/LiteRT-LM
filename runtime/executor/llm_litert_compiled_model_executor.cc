@@ -723,12 +723,10 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
         gpu_compilation_options.SetSerializeExternalTensors(true);
       }
       // Use NoExternalTensorsMode to get better performance.
-      bool no_external_tensor_mode =
-          executor_settings.GetBackendConfig<GpuConfig>()
-              ->no_external_tensor_mode;
-      gpu_compilation_options.EnableNoExternalTensorsMode(
-          no_external_tensor_mode);
-      if (no_external_tensor_mode) {
+      bool external_tensor_mode =
+          executor_settings.GetBackendConfig<GpuConfig>()->external_tensor_mode;
+      gpu_compilation_options.EnableNoExternalTensorsMode(!external_tensor_mode);
+      if (!external_tensor_mode) {
         // This option prevents KVCache handling from being affected by
         // BHWC conversion in NoExternalTensorsMode.
         gpu_compilation_options.AddExternalTensorPattern("kv_cache_");

@@ -257,7 +257,7 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
     ASSIGN_OR_RETURN(
         auto gpu_settings,
         executor_settings.MutableBackendConfig<litert::lm::GpuConfig>());
-    gpu_settings.no_external_tensor_mode = settings.gpu_no_external_tensor_mode;
+    gpu_settings.external_tensor_mode = settings.gpu_external_tensor_mode;
     executor_settings.SetBackendConfig(gpu_settings);
   }
   auto session_config = litert::lm::SessionConfig::CreateDefault();

@@ -86,10 +86,10 @@ ABSL_FLAG(bool, multi_turns, false,
 ABSL_FLAG(int, num_cpu_threads, 0,
           "If greater than 0, the number of CPU threads to use for the LLM "
           "execution with CPU backend.");
-ABSL_FLAG(bool, gpu_no_external_tensor_mode, true,
-          "If true (by default), the GPU backend will use no external tensor "
+ABSL_FLAG(bool, gpu_external_tensor_mode, false,
+          "If false (by default), the GPU backend will use no external tensor "
           "mode which runs slightly faster during decode. It should be set "
-          "false when GPU backend doesn't support no external tensor mode, "
+          "true when GPU backend doesn't support no external tensor mode, "
           "e.g. Vulkan or OpenGL.");
 ABSL_FLAG(bool, configure_magic_numbers, true,
           "If true and the model contains magic numbers, present magic number "
@@ -174,7 +174,7 @@ absl::Status MainHelper(int argc, char** argv) {
            "[--async=<true|false>] [--force_f32=<true|false] "
            "[--report_peak_memory_footprint] [--multi_turns=<true|false>] "
            "[--num_cpu_threads=<num_cpu_threads>] "
-           "[--gpu_no_external_tensor_mode=<true|false>] "
+           "[--gpu_external_tensor_mode=<true|false>] "
            "[--configure_magic_numbers=<true|false>] "
            "[--verify_magic_numbers=<true|false>] "
            "[--clear_kv_cache_before_prefill=<true|false>] "
@@ -209,8 +209,8 @@ absl::Status MainHelper(int argc, char** argv) {
   settings.force_f32 = absl::GetFlag(FLAGS_force_f32);
   settings.multi_turns = absl::GetFlag(FLAGS_multi_turns);
   settings.num_cpu_threads = absl::GetFlag(FLAGS_num_cpu_threads);
-  settings.gpu_no_external_tensor_mode =
-      absl::GetFlag(FLAGS_gpu_no_external_tensor_mode);
+  settings.gpu_external_tensor_mode =
+      absl::GetFlag(FLAGS_gpu_external_tensor_mode);
   settings.configure_magic_numbers =
       absl::GetFlag(FLAGS_configure_magic_numbers);
   settings.verify_magic_numbers = absl::GetFlag(FLAGS_verify_magic_numbers);

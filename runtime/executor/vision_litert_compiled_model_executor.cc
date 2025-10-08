@@ -176,7 +176,6 @@ absl::Status VisionLiteRtCompiledModelExecutor::VisionAdapter::Initialize() {
       gpu_compilation_options.SetDelegatePrecision(
           LiteRtDelegatePrecision::kLiteRtDelegatePrecisionFp16);
       gpu_compilation_options.SetPreferTextureWeights(true);
-      gpu_compilation_options.EnableNoExternalTensorsMode(true);
       options.AddOpaqueOptions(std::move(gpu_compilation_options));
       options.SetHardwareAccelerators(kLiteRtHwAcceleratorGpu);
       break;
