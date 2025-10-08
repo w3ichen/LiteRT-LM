@@ -184,14 +184,14 @@ void LogTensor(TensorBuffer& tensor, size_t num_values_to_log,
 
 absl::Status LlmLiteRtCompiledModelExecutor::Prefill(
     const ExecutorInputs& inputs, const ExecutorPrefillParams& params) {
-  LITERT_ASSIGN_OR_RETURN_ABSL(auto tensor_type,
-                               (*inputs.GetTextTokenIdsPtr())->TensorType());
+  LITERT_ASSIGN_OR_RETURN(auto tensor_type,
+                          (*inputs.GetTextTokenIdsPtr())->TensorType());
   // Only accept batch size 1 for now.
   RET_CHECK_EQ(tensor_type.Layout().Dimensions()[0], 1);
   RET_CHECK_GT(tensor_type.Layout().Dimensions()[1], 0)
       << "Prefill token ids must be non-empty.";
-  LITERT_ASSIGN_OR_RETURN_ABSL(auto ids, ReferTensorBufferAsSpan<int32_t>(
-                                             *(*inputs.GetTextTokenIdsPtr())));
+  LITERT_ASSIGN_OR_RETURN(auto ids, ReferTensorBufferAsSpan<int32_t>(
+                                        *(*inputs.GetTextTokenIdsPtr())));
   if (embedding_lookup_ != nullptr) {
     RETURN_IF_ERROR(embedding_lookup_->UpdateMultiModalEmbeddings(inputs));
   }
@@ -275,18 +275,17 @@ absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
     // Fill the input buffers with scoped locks.
     auto& prefill_input_pos =
         curr_prefill_input_buffers[signatures_.input_positions];
-    LITERT_ASSIGN_OR_RETURN_ABSL(auto prefill_input_pos_size,
-                                 prefill_input_pos.PackedSize());
-    LITERT_ASSIGN_OR_RETURN_ABSL(
+    LITERT_ASSIGN_OR_RETURN(auto prefill_input_pos_size,
+                            prefill_input_pos.PackedSize());
+    LITERT_ASSIGN_OR_RETURN(
         auto prefill_input_pos_lock_and_addr,
         ::litert::TensorBufferScopedLock::Create(
             prefill_input_pos, TensorBuffer::LockMode::kWrite));
     auto* prefill_input_pos_ptr =
         static_cast<int32_t*>(prefill_input_pos_lock_and_addr.second);
-    bool has_input_attn_mask = signatures_.input_attn_mask.has_value();
 
     memset(prefill_input_pos_ptr, 0, prefill_input_pos_size);
-    if (has_input_attn_mask) {
+    if (signatures_.input_attn_mask.has_value()) {
       RETURN_IF_ERROR(InitializeAttentionMask(
           curr_prefill_input_buffers[signatures_.input_attn_mask.value()],
           IsCalculationPrecisionF16()));
@@ -305,7 +304,7 @@ absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
     std::vector<int> tokens_to_lookup;
     // If next_input_token_id_ is set, we will use it as the first token of the
     // current prefill.
-    if (next_input_token_id_.has_value()) {
+    if (next_input_token_id_) {
       tokens_to_lookup.push_back(*next_input_token_id_);
     }
     // Append the rest of the tokens to the tokens_to_lookup.
@@ -322,9 +321,9 @@ absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
     if (!signatures_.input_tokens.empty()) {
       auto& prefill_input_buffer =
           curr_prefill_input_buffers[signatures_.input_tokens];
-      LITERT_ASSIGN_OR_RETURN_ABSL(auto prefill_input_size,
-                                   prefill_input_buffer.PackedSize());
-      LITERT_ASSIGN_OR_RETURN_ABSL(
+      LITERT_ASSIGN_OR_RETURN(auto prefill_input_size,
+                              prefill_input_buffer.PackedSize());
+      LITERT_ASSIGN_OR_RETURN(
           auto prefill_input_lock_and_addr,
           ::litert::TensorBufferScopedLock::Create(
               prefill_input_buffer, TensorBuffer::LockMode::kWrite));
@@ -343,7 +342,7 @@ absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
           tokens_to_lookup, prefill_input_embeddings_buffer, 0));
 
       // We may have per layer embedding as well.
-      if (signatures_.input_per_layer_embeddings.has_value()) {
+      if (signatures_.input_per_layer_embeddings) {
         TensorBuffer* prefill_input_per_layer_embeddings_buffer =
             &(curr_prefill_input_buffers[signatures_.input_per_layer_embeddings
                                              .value()]);
@@ -351,7 +350,7 @@ absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
             tokens_to_lookup, prefill_input_per_layer_embeddings_buffer, 0));
       }
     }
-    if (has_input_attn_mask) {
+    if (signatures_.input_attn_mask.has_value()) {
       RETURN_IF_ERROR(FillAttentionMask(
           curr_prefill_input_buffers[signatures_.input_attn_mask.value()],
           start_step,
@@ -362,26 +361,23 @@ absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
       prefill_input_buffers;
   for (const auto& [input_name, input_buffer] : curr_prefill_input_buffers) {
-    auto duplicated_input_buffer = input_buffer.Duplicate();
-    RET_CHECK(duplicated_input_buffer) << "Failed to duplicate input buffer.";
-    prefill_input_buffers[input_name] = std::move(*duplicated_input_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto input_buffer_dup, input_buffer.Duplicate());
+    prefill_input_buffers[input_name] = std::move(input_buffer_dup);
   }
   for (const auto& [input_name, input_buffer] : *input_kv_cache_buffers_) {
-    auto duplicated_input_buffer = input_buffer.Duplicate();
-    RET_CHECK(duplicated_input_buffer) << "Failed to duplicate input buffer.";
-    prefill_input_buffers[input_name] = std::move(*duplicated_input_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto input_buffer_dup, input_buffer.Duplicate());
+    prefill_input_buffers[input_name] = std::move(input_buffer_dup);
   }
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
       prefill_output_buffers;
   for (const auto& [output_name, output_buffer] : *output_kv_cache_buffers_) {
-    auto duplicated_output_buffer = output_buffer.Duplicate();
-    RET_CHECK(duplicated_output_buffer) << "Failed to duplicate output buffer.";
-    prefill_output_buffers[output_name] = std::move(*duplicated_output_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto output_buffer_dup, output_buffer.Duplicate());
+    prefill_output_buffers[output_name] = std::move(output_buffer_dup);
   }
 
-  auto res = compiled_model_.Run(prefill_signature, prefill_input_buffers,
-                                 prefill_output_buffers);
-  RET_CHECK(res) << "Failed to run compiled model." << res.Error().Message();
+  LITERT_RETURN_IF_ERROR(compiled_model_.Run(
+      prefill_signature, prefill_input_buffers, prefill_output_buffers));
+
   std::swap(input_kv_cache_buffers_, output_kv_cache_buffers_);
   return absl::OkStatus();
 }
@@ -395,9 +391,8 @@ absl::StatusOr<int> LlmLiteRtCompiledModelExecutor::GetIdToDecode(
       // Input token ids provided, so use it regardless of whether next input
       // token id is set. Only accept batch size 1 and a single token for now.
       RET_CHECK_EQ(*input_tensor_size, 1 * sizeof(int32_t));
-      LITERT_ASSIGN_OR_RETURN_ABSL(
-          auto ids,
-          ReferTensorBufferAsSpan<int32_t>(*(*inputs.GetTextTokenIdsPtr())));
+      LITERT_ASSIGN_OR_RETURN(auto ids, ReferTensorBufferAsSpan<int32_t>(
+                                            *(*inputs.GetTextTokenIdsPtr())));
       id = ids[0];
     }
   } else {
@@ -413,7 +408,7 @@ absl::Status LlmLiteRtCompiledModelExecutor::Decode(
     ::litert::TensorBuffer& output_tokens) {
 
   ASSIGN_OR_RETURN(decoded_logits_, DecodeLogits(ExecutorInputs()));
-  LITERT_ASSIGN_OR_RETURN_ABSL(auto size, decoded_logits_.PackedSize());
+  LITERT_ASSIGN_OR_RETURN(auto size, decoded_logits_.PackedSize());
   if (decoded_logits_vector_.empty()) {
     decoded_logits_vector_ = std::vector<float>(size / sizeof(float));
   }
@@ -422,8 +417,8 @@ absl::Status LlmLiteRtCompiledModelExecutor::Decode(
   // Read the first output token for the next input token id.
   bool reset_output_token = false;
   {
-    LITERT_ASSIGN_OR_RETURN_ABSL(
-        auto lock_and_addr, ::litert::TensorBufferScopedLock::Create(
+    LITERT_ASSIGN_OR_RETURN(auto lock_and_addr,
+                            ::litert::TensorBufferScopedLock::Create(
                                 output_tokens, TensorBuffer::LockMode::kRead));
     auto output_tokens_ptr = static_cast<int32_t*>(lock_and_addr.second);
     reset_output_token = output_tokens_ptr[0] < 0;
@@ -432,8 +427,8 @@ absl::Status LlmLiteRtCompiledModelExecutor::Decode(
 
   // If the first output token is invalid, reset it to 0 to avoid crash.
   if (reset_output_token) {
-    LITERT_ASSIGN_OR_RETURN_ABSL(
-        auto lock_and_addr, ::litert::TensorBufferScopedLock::Create(
+    LITERT_ASSIGN_OR_RETURN(auto lock_and_addr,
+                            ::litert::TensorBufferScopedLock::Create(
                                 output_tokens, TensorBuffer::LockMode::kWrite));
     ABSL_LOG(WARNING) << "Invalid decode and sample result. The sampled token "
                          "is casted to 0 to avoid crash.";
@@ -456,13 +451,12 @@ absl::Status LlmLiteRtCompiledModelExecutor::Decode(
     if (!signatures_.input_tokens.empty()) {
       auto& decode_input_buffer =
           decode_input_buffers_[signatures_.input_tokens];
-      auto decode_input_lock_and_addr =
-          ::litert::TensorBufferScopedLock::Create(
-              decode_input_buffer, TensorBuffer::LockMode::kWrite);
-      RET_CHECK(decode_input_lock_and_addr)
-          << "Failed to lock decode input buffer.";
+      LITERT_ASSIGN_OR_RETURN(
+          auto decode_input_lock_and_addr,
+          TensorBufferScopedLock::Create(decode_input_buffer,
+                                         TensorBuffer::LockMode::kWrite));
       int32_t* decode_input_ptr =
-          static_cast<int32_t*>(decode_input_lock_and_addr->second);
+          static_cast<int32_t*>(decode_input_lock_and_addr.second);
       decode_input_ptr[0] = id;
     } else {
       if (!signatures_.input_embeddings.has_value()) {
@@ -484,15 +478,13 @@ absl::Status LlmLiteRtCompiledModelExecutor::Decode(
     }
     auto& decode_input_pos_buffer =
         decode_input_buffers_[signatures_.input_positions];
-    auto decode_input_pos_lock_and_addr =
-        ::litert::TensorBufferScopedLock::Create(
-            decode_input_pos_buffer, TensorBuffer::LockMode::kWrite);
-    RET_CHECK(decode_input_pos_lock_and_addr)
-        << "Failed to lock decode input position buffer.";
+    LITERT_ASSIGN_OR_RETURN(
+        auto decode_input_pos_lock_and_addr,
+        TensorBufferScopedLock::Create(decode_input_pos_buffer,
+                                       TensorBuffer::LockMode::kWrite));
     auto* decode_input_pos_ptr =
-        static_cast<int32_t*>(decode_input_pos_lock_and_addr->second);
-    bool has_input_attn_mask = signatures_.input_attn_mask.has_value();
-    if (has_input_attn_mask) {
+        static_cast<int32_t*>(decode_input_pos_lock_and_addr.second);
+    if (signatures_.input_attn_mask.has_value()) {
       RETURN_IF_ERROR(InitializeAttentionMask(
           decode_input_buffers_[signatures_.input_attn_mask.value()],
           IsCalculationPrecisionF16()));
@@ -506,35 +498,32 @@ absl::Status LlmLiteRtCompiledModelExecutor::Decode(
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
       decode_input_buffers;
   for (const auto& [input_name, input_buffer] : decode_input_buffers_) {
-    auto duplicated_input_buffer = input_buffer.Duplicate();
-    RET_CHECK(duplicated_input_buffer) << "Failed to duplicate input buffer.";
-    decode_input_buffers[input_name] = std::move(*duplicated_input_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto input_buffer_dup, input_buffer.Duplicate());
+    decode_input_buffers[input_name] = std::move(input_buffer_dup);
   }
   for (const auto& [input_name, input_buffer] : *input_kv_cache_buffers_) {
-    auto duplicated_input_buffer = input_buffer.Duplicate();
-    RET_CHECK(duplicated_input_buffer) << "Failed to duplicate input buffer.";
-    decode_input_buffers[input_name] = std::move(*duplicated_input_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto input_buffer_dup, input_buffer.Duplicate());
+    decode_input_buffers[input_name] = std::move(input_buffer_dup);
   }
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
       decode_output_buffers;
   for (const auto& [output_name, output_buffer] : decode_output_buffers_) {
-    auto duplicated_output_buffer = output_name == signatures_.output_logits
-                                        ? output_logits.Duplicate()
-                                        : output_buffer.Duplicate();
-    RET_CHECK(duplicated_output_buffer) << "Failed to duplicate output buffer.";
-    decode_output_buffers[output_name] = std::move(*duplicated_output_buffer);
+    // LITERT_ASSIGN_OR_RETURN() causes a compilation error on windows.
+    auto output_buffer_dup = output_name == signatures_.output_logits
+                                 ? output_logits.Duplicate()
+                                 : output_buffer.Duplicate();
+    RET_CHECK(output_buffer_dup) << "Failed to duplicate output buffer.";
+    decode_output_buffers[output_name] = std::move(*output_buffer_dup);
   }
   for (const auto& [output_name, output_buffer] : *output_kv_cache_buffers_) {
-    auto duplicated_output_buffer = output_buffer.Duplicate();
-    RET_CHECK(duplicated_output_buffer) << "Failed to duplicate output buffer.";
-    decode_output_buffers[output_name] = std::move(*duplicated_output_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto output_buffer_dup, output_buffer.Duplicate());
+    decode_output_buffers[output_name] = std::move(output_buffer_dup);
   }
 
-  auto res = compiled_model_.Run(kDecodeSignatureRunner, decode_input_buffers,
-                                 decode_output_buffers);
-  RET_CHECK(res) << "Failed to run compiled model: " << res.Error().Message();
-  std::swap(input_kv_cache_buffers_, output_kv_cache_buffers_);
+  LITERT_RETURN_IF_ERROR(compiled_model_.Run(
+      kDecodeSignatureRunner, decode_input_buffers, decode_output_buffers));
 
+  std::swap(input_kv_cache_buffers_, output_kv_cache_buffers_);
   ++current_step_;
   return absl::OkStatus();
 }
@@ -551,13 +540,12 @@ LlmLiteRtCompiledModelExecutor::DecodeLogits(const ExecutorInputs& inputs) {
     if (!signatures_.input_tokens.empty()) {
       auto& decode_input_buffer =
           decode_input_buffers_[signatures_.input_tokens];
-      auto decode_input_lock_and_addr =
-          ::litert::TensorBufferScopedLock::Create(
-              decode_input_buffer, TensorBuffer::LockMode::kWrite);
-      RET_CHECK(decode_input_lock_and_addr)
-          << "Failed to lock decode input buffer.";
+      LITERT_ASSIGN_OR_RETURN(
+          auto decode_input_lock_and_addr,
+          TensorBufferScopedLock::Create(decode_input_buffer,
+                                         TensorBuffer::LockMode::kWrite));
       int32_t* decode_input_ptr =
-          static_cast<int32_t*>(decode_input_lock_and_addr->second);
+          static_cast<int32_t*>(decode_input_lock_and_addr.second);
       decode_input_ptr[0] = id;
     } else {
       if (!signatures_.input_embeddings.has_value()) {
@@ -580,15 +568,13 @@ LlmLiteRtCompiledModelExecutor::DecodeLogits(const ExecutorInputs& inputs) {
 
     auto& decode_input_pos_buffer =
         decode_input_buffers_[signatures_.input_positions];
-    auto decode_input_pos_lock_and_addr =
-        ::litert::TensorBufferScopedLock::Create(
-            decode_input_pos_buffer, TensorBuffer::LockMode::kWrite);
-    RET_CHECK(decode_input_pos_lock_and_addr)
-        << "Failed to lock decode input position buffer.";
+    LITERT_ASSIGN_OR_RETURN(
+        auto decode_input_pos_lock_and_addr,
+        TensorBufferScopedLock::Create(decode_input_pos_buffer,
+                                       TensorBuffer::LockMode::kWrite));
     auto* decode_input_pos_ptr =
-        static_cast<int32_t*>(decode_input_pos_lock_and_addr->second);
-    bool has_input_attn_mask = signatures_.input_attn_mask.has_value();
-    if (has_input_attn_mask) {
+        static_cast<int32_t*>(decode_input_pos_lock_and_addr.second);
+    if (signatures_.input_attn_mask.has_value()) {
       RETURN_IF_ERROR(InitializeAttentionMask(
           decode_input_buffers_[signatures_.input_attn_mask.value()],
           IsCalculationPrecisionF16()));
@@ -602,47 +588,42 @@ LlmLiteRtCompiledModelExecutor::DecodeLogits(const ExecutorInputs& inputs) {
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
       decode_input_buffers;
   for (const auto& [input_name, input_buffer] : decode_input_buffers_) {
-    auto duplicated_input_buffer = input_buffer.Duplicate();
-    RET_CHECK(duplicated_input_buffer) << "Failed to duplicate input buffer.";
-    decode_input_buffers[input_name] = std::move(*duplicated_input_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto input_buffer_dup, input_buffer.Duplicate());
+    decode_input_buffers[input_name] = std::move(input_buffer_dup);
   }
   for (const auto& [input_name, input_buffer] : *input_kv_cache_buffers_) {
-    auto duplicated_input_buffer = input_buffer.Duplicate();
-    RET_CHECK(duplicated_input_buffer) << "Failed to duplicate input buffer.";
-    decode_input_buffers[input_name] = std::move(*duplicated_input_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto input_buffer_dup, input_buffer.Duplicate());
+    decode_input_buffers[input_name] = std::move(input_buffer_dup);
+    ;
   }
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
       decode_output_buffers;
   for (const auto& [output_name, output_buffer] : decode_output_buffers_) {
-    auto duplicated_output_buffer = output_buffer.Duplicate();
-    RET_CHECK(duplicated_output_buffer) << "Failed to duplicate output buffer.";
-    decode_output_buffers[output_name] = std::move(*duplicated_output_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto output_buffer_dup, output_buffer.Duplicate());
+    decode_output_buffers[output_name] = std::move(output_buffer_dup);
   }
   for (const auto& [output_name, output_buffer] : *output_kv_cache_buffers_) {
-    auto duplicated_output_buffer = output_buffer.Duplicate();
-    RET_CHECK(duplicated_output_buffer) << "Failed to duplicate output buffer.";
-    decode_output_buffers[output_name] = std::move(*duplicated_output_buffer);
+    LITERT_ASSIGN_OR_RETURN(auto output_buffer_dup, output_buffer.Duplicate());
+    decode_output_buffers[output_name] = std::move(output_buffer_dup);
   }
 
-  auto res = compiled_model_.Run(kDecodeSignatureRunner, decode_input_buffers,
-                                 decode_output_buffers);
-  RET_CHECK(res) << "Failed to run compiled model: " << res.Error().Message();
+  LITERT_RETURN_IF_ERROR(compiled_model_.Run(
+      kDecodeSignatureRunner, decode_input_buffers, decode_output_buffers));
+
   std::swap(input_kv_cache_buffers_, output_kv_cache_buffers_);
-
   ++current_step_;
-  auto output_logits =
-      decode_output_buffers[signatures_.output_logits].Duplicate();
-  if (!output_logits.HasValue()) {
-    return absl::InternalError(output_logits.Error().Message());
-  }
+
+  LITERT_ASSIGN_OR_RETURN(
+      auto output_logits,
+      decode_output_buffers[signatures_.output_logits].Duplicate());
 
   const auto& settings = executor_settings_.GetAdvancedSettings();
   if (settings && settings->num_logits_to_print_after_decode > 0) {
-    LogTensor(*output_logits, settings->num_logits_to_print_after_decode,
+    LogTensor(output_logits, settings->num_logits_to_print_after_decode,
               "Logits");
   }
 
-  return std::move(*output_logits);
+  return output_logits;
 }
 
 absl::Status LlmLiteRtCompiledModelExecutor::SampleLogits(
@@ -652,8 +633,8 @@ absl::Status LlmLiteRtCompiledModelExecutor::SampleLogits(
   if (sampler_ == nullptr) {
     ASSIGN_OR_RETURN(auto sampler_backend,
                      GetSamplerBackend(executor_settings_));
-    LITERT_ASSIGN_OR_RETURN_ABSL(const auto decoded_logits_tensor_type,
-                                 logits.TensorType());
+    LITERT_ASSIGN_OR_RETURN(auto decoded_logits_tensor_type,
+                            logits.TensorType());
     proto::SamplerParameters sampler_params;
     sampler_params.set_type(proto::SamplerParameters::TOP_P);
     sampler_params.set_k(1);
@@ -687,7 +668,7 @@ absl::StatusOr<int> LlmLiteRtCompiledModelExecutor::GetVocabSize() {
     return absl::NotFoundError("Output logits info not found.");
   }
 
-  LITERT_ASSIGN_OR_RETURN_ABSL(
+  LITERT_ASSIGN_OR_RETURN(
       auto logits_tensor_type,
       decode_output_buffers_[signatures_.output_logits].TensorType());
   RET_CHECK_EQ(logits_tensor_type.Layout().Dimensions().size(), 3);
@@ -716,8 +697,8 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
   switch (backend) {
     case Backend::GPU: {
       // TODO: b/403132820 - Add accelerator compilation options for ML_DRIFT.
-      LITERT_ASSIGN_OR_RETURN_ABSL(GpuOptions gpu_compilation_options,
-                                   GpuOptions::Create());
+      LITERT_ASSIGN_OR_RETURN(auto gpu_compilation_options,
+                              GpuOptions::Create());
       gpu_compilation_options.EnableConstantTensorSharing(true);
       gpu_compilation_options.EnableInfiniteFloatCapping(true);
       gpu_compilation_options.EnableAllowSrcQuantizedFcConvOps(true);
@@ -794,8 +775,7 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
           default_xnnpack_flags |
           TFLITE_XNNPACK_DELEGATE_FLAG_ENABLE_LATEST_OPERATORS |
           TFLITE_XNNPACK_DELEGATE_FLAG_ENABLE_SUBGRAPH_RESHAPING);
-      LITERT_ASSIGN_OR_RETURN_ABSL(RuntimeOptions runtime_options,
-                                   RuntimeOptions::Create());
+      LITERT_ASSIGN_OR_RETURN(auto runtime_options, RuntimeOptions::Create());
       runtime_options.SetShloCompositeInlining(true);
       compilation_options->AddOpaqueOptions(std::move(runtime_options));
       compilation_options->AddOpaqueOptions(
@@ -808,6 +788,10 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
           "Unsupported backend: ", executor_settings.GetBackend()));
   }
 
+  if (!litert_model || !*litert_model) {
+    return absl::InternalError("Failed to build LiteRt model");
+  }
+
   std::vector<Environment::Option> env_options;
   MagicNumberConfigsHelper helper;
   if (!executor_settings.GetAdvancedSettings() ||  // Default is true.
@@ -815,21 +799,11 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
     env_options = helper.GetLiteRtEnvOptions(*litert_model, executor_settings);
   }
 
-  auto lrt_env = ::litert::Environment::Create(env_options);
-  if (!lrt_env) {
-    return absl::InternalError(absl::StrCat(
-        "Failed to create litert environment: ", lrt_env.Error().Message()));
-  }
-
-  if (!litert_model || !*litert_model) {
-    return absl::InternalError("Failed to build LiteRt model");
-  }
-  auto compiled_model = ::litert::CompiledModel::Create(
-      *lrt_env, *litert_model, std::move(*compilation_options));
-  if (!compiled_model) {
-    return absl::InternalError(absl::StrCat("Failed to create compiled model: ",
-                                            compiled_model.Error().Message()));
-  }
+  LITERT_ASSIGN_OR_RETURN(auto lrt_env, Environment::Create(env_options));
+  LITERT_ASSIGN_OR_RETURN(
+      auto compiled_model,
+      CompiledModel::Create(lrt_env, *litert_model,
+                            std::move(*compilation_options)));
 
   absl::flat_hash_map<absl::string_view, TensorBuffer> decode_input_buffers;
   absl::flat_hash_map<absl::string_view, TensorBuffer> decode_output_buffers;
@@ -838,46 +812,42 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
 
   absl::string_view prefill_signature_key = "";
   for (int i = 0; i < litert_model->GetNumSignatures(); ++i) {
-    LITERT_ASSIGN_OR_RETURN_ABSL(auto sig, litert_model->GetSignature(i));
+    LITERT_ASSIGN_OR_RETURN(auto sig, litert_model->GetSignature(i));
     absl::string_view key = sig.Key();
     if (absl::StartsWith(key, kPrefillSignatureRunner)) {
       prefill_signature_key = key;
       break;
     }
   }
-  auto prefill_signature = litert_model->FindSignature(prefill_signature_key);
-  RET_CHECK(prefill_signature) << "Prefill signature not found.";
+  LITERT_ASSIGN_OR_RETURN(auto prefill_signature,
+                          litert_model->FindSignature(prefill_signature_key));
   std::string kv_cache_k_root_name;
   std::string kv_cache_v_root_name;
-  RETURN_IF_ERROR(GetCacheRootNames(prefill_signature->InputNames(),
+  RETURN_IF_ERROR(GetCacheRootNames(prefill_signature.InputNames(),
                                     kv_cache_k_root_name,
                                     kv_cache_v_root_name));
-  auto decode_signature = litert_model->FindSignature(kDecodeSignatureRunner);
+  LITERT_ASSIGN_OR_RETURN(auto decode_signature,
+                          litert_model->FindSignature(kDecodeSignatureRunner));
   ASSIGN_OR_RETURN(
       ModelSignatures signatures,
-      GetModelSignaturesFromInputOutputNames(decode_signature->InputNames(),
-                                             decode_signature->OutputNames()));
+      GetModelSignaturesFromInputOutputNames(decode_signature.InputNames(),
+                                             decode_signature.OutputNames()));
 
-  for (auto input_name : prefill_signature->InputNames()) {
+  for (auto input_name : prefill_signature.InputNames()) {
     // Skip creating buffers for the input tokens, positions and attn mask. Move
     // into prefill function to create them based on the ids size.
     if (!absl::StartsWith(input_name, kv_cache_k_root_name) &&
         !absl::StartsWith(input_name, kv_cache_v_root_name)) {
       continue;
     }
-    auto input_buffer =
-        compiled_model->CreateInputBuffer(prefill_signature_key, input_name);
-    if (!input_buffer) {
-      return absl::InternalError(
-          absl::StrCat("Failed to create prefill input buffer for ", "'",
-                       input_name, "' : ", input_buffer.Error().Message()));
-    }
+    LITERT_ASSIGN_OR_RETURN(
+        auto input_buffer,
+        compiled_model.CreateInputBuffer(prefill_signature_key, input_name));
     if (backend == Backend::CPU) {
-      auto output_buffer = input_buffer->Duplicate();
-      RET_CHECK(output_buffer) << "Failed to duplicate input buffer.";
-      output_kv_cache_buffers[input_name] = std::move(*output_buffer);
+      LITERT_ASSIGN_OR_RETURN(auto output_buffer, input_buffer.Duplicate());
+      output_kv_cache_buffers[input_name] = std::move(output_buffer);
     }
-    input_kv_cache_buffers[input_name] = std::move(*input_buffer);
+    input_kv_cache_buffers[input_name] = std::move(input_buffer);
     const auto& settings = executor_settings.GetAdvancedSettings();
     if (settings && settings->clear_kv_cache_before_prefill) {
       auto kv_cache_span =
@@ -888,18 +858,14 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
       }
     }
   }
-  for (auto output_name : prefill_signature->OutputNames()) {
-    auto output_buffer =
-        compiled_model->CreateOutputBuffer(prefill_signature_key, output_name);
-    if (!output_buffer) {
-      return absl::InternalError(
-          absl::StrCat("Failed to create prefill output buffer for ", "'",
-                       output_name, "' : ", output_buffer.Error().Message()));
-    }
+  for (auto output_name : prefill_signature.OutputNames()) {
+    LITERT_ASSIGN_OR_RETURN(
+        auto output_buffer,
+        compiled_model.CreateOutputBuffer(prefill_signature_key, output_name));
     if (absl::StartsWith(output_name, kv_cache_k_root_name) ||
         absl::StartsWith(output_name, kv_cache_v_root_name)) {
       if (backend == Backend::GPU) {
-        output_kv_cache_buffers[output_name] = std::move(*output_buffer);
+        output_kv_cache_buffers[output_name] = std::move(output_buffer);
       }
       // For CPU, we will use single buffer for kv cache input and output to
       // improve performance and memory usage.
@@ -915,39 +881,30 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
     }
   }
 
-  for (auto input_name : decode_signature->InputNames()) {
+  for (auto input_name : decode_signature.InputNames()) {
     if (!absl::StartsWith(input_name, kv_cache_k_root_name) &&
         !absl::StartsWith(input_name, kv_cache_v_root_name)) {
-      auto input_buffer =
-          compiled_model->CreateInputBuffer(kDecodeSignatureRunner, input_name);
-      if (!input_buffer) {
-        return absl::InternalError(
-            absl::StrCat("Failed to create decode input buffer for ", "'",
-                         input_name, "' : ", input_buffer.Error().Message()));
-      }
-      decode_input_buffers[input_name] = std::move(*input_buffer);
+      LITERT_ASSIGN_OR_RETURN(
+          auto input_buffer,
+          compiled_model.CreateInputBuffer(kDecodeSignatureRunner, input_name));
+      decode_input_buffers[input_name] = std::move(input_buffer);
     }
   }
-  for (auto output_name : decode_signature->OutputNames()) {
+  for (auto output_name : decode_signature.OutputNames()) {
     if (!absl::StartsWith(output_name, kv_cache_k_root_name) &&
         !absl::StartsWith(output_name, kv_cache_v_root_name)) {
-      auto output_buffer = compiled_model->CreateOutputBuffer(
-          kDecodeSignatureRunner, output_name);
-      if (!output_buffer) {
-        return absl::InternalError(
-            absl::StrCat("Failed to create decode output buffer for ", "'",
-                         output_name, "' : ", output_buffer.Error().Message()));
-      }
-      decode_output_buffers[output_name] = std::move(*output_buffer);
+      LITERT_ASSIGN_OR_RETURN(auto output_buffer,
+                              compiled_model.CreateOutputBuffer(
+                                  kDecodeSignatureRunner, output_name));
+      decode_output_buffers[output_name] = std::move(output_buffer);
     }
   }
 
-  auto output_logits_buffer =
-      decode_output_buffers[signatures.output_logits].Duplicate();
-  RET_CHECK(output_logits_buffer)
-      << "Failed to duplicate output logits buffer.";
-  LITERT_ASSIGN_OR_RETURN_ABSL(auto output_logits_buffer_tensor_type,
-                               output_logits_buffer->TensorType());
+  LITERT_ASSIGN_OR_RETURN(
+      auto output_logits_buffer,
+      decode_output_buffers[signatures.output_logits].Duplicate());
+  LITERT_ASSIGN_OR_RETURN(auto output_logits_buffer_tensor_type,
+                          output_logits_buffer.TensorType());
   RET_CHECK(output_logits_buffer_tensor_type.Layout().Dimensions().size() == 3)
       << "Output logits must be (batch, seq, vocab)";
   RET_CHECK(output_logits_buffer_tensor_type.Layout().Dimensions()[0] == 1)
@@ -966,8 +923,8 @@ LlmLiteRtCompiledModelExecutor::Create(LlmExecutorSettings executor_settings,
                                              per_layer_embedding_lookup));
 
   return absl::WrapUnique(new LlmLiteRtCompiledModelExecutor(
-      std::move(executor_settings), std::move(*lrt_env), litert_model,
-      std::move(*compiled_model), std::move(decode_input_buffers),
+      std::move(executor_settings), std::move(lrt_env), litert_model,
+      std::move(compiled_model), std::move(decode_input_buffers),
       std::move(decode_output_buffers), std::move(input_kv_cache_buffers),
       std::move(output_kv_cache_buffers), std::move(prefill_runner_set),
       signatures, batch_size, std::move(weight_cache_path),
