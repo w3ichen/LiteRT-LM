@@ -649,6 +649,7 @@ cc_test(
         "@litert//litert/cc:litert_element_type",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_macros",
+        "@litert//litert/cc:litert_model",
         "@litert//litert/cc:litert_tensor_buffer",
         "//runtime/util:litert_status_util",
         "//runtime/util:scoped_file",

@@ -77,6 +77,17 @@ absl::StatusOr<int> GetValidCount(const TensorBuffer& mask_buffer) {
   return 0;
 }
 
+absl::Status InitializeBuffers(std::vector<TensorBuffer>& buffers) {
+  for (auto& buffer : buffers) {
+    LITERT_ASSIGN_OR_RETURN(
+        auto buffer_lock_and_addr,
+        TensorBufferScopedLock::Create(buffer, TensorBuffer::LockMode::kWrite));
+    LITERT_ASSIGN_OR_RETURN(auto packed_size, buffer.PackedSize());
+    memset(buffer_lock_and_addr.second, 0, packed_size);
+  }
+  return absl::OkStatus();
+}
+
 inline int CeilIntDiv(int a, int b) { return (a + b - 1) / b; }
 
 }  // namespace
@@ -115,6 +126,8 @@ absl::Status AudioLiteRtCompiledModelExecutor::AudioEncoder::Initialize() {
                      "buffer but got ",
                      output_buffers_.size()));
   }
+  LITERT_RETURN_IF_ERROR(InitializeBuffers(input_buffers_));
+  LITERT_RETURN_IF_ERROR(InitializeBuffers(output_buffers_));
   LITERT_ASSIGN_OR_RETURN(auto signature, model_.GetSignature(0));
   for (int i = 0; i < signature.InputNames().size(); ++i) {
     if (absl::StrContains(signature.InputNames()[i], kSrcInputsName)) {
@@ -122,12 +135,6 @@ absl::Status AudioLiteRtCompiledModelExecutor::AudioEncoder::Initialize() {
     } else if (absl::StrContains(signature.InputNames()[i], kMaskName)) {
       input_mask_buffer_ = &input_buffers_[i];
     }
-    LITERT_ASSIGN_OR_RETURN(
-        auto buffer_lock_and_addr,
-        TensorBufferScopedLock::Create(input_buffers_[i],
-                                       TensorBuffer::LockMode::kWrite));
-    LITERT_ASSIGN_OR_RETURN(auto packed_size, input_buffers_[i].PackedSize());
-    memset(buffer_lock_and_addr.second, 0, packed_size);
   }
   if (spectrogram_buffer_ == nullptr) {
     return absl::InvalidArgumentError(
@@ -192,6 +199,8 @@ absl::Status AudioLiteRtCompiledModelExecutor::AudioAdapter::Initialize() {
   }
   LITERT_ASSIGN_OR_RETURN(output_buffers_, compiled_model_.CreateOutputBuffers(
                                                /*signature_index=*/0));
+  LITERT_RETURN_IF_ERROR(InitializeBuffers(input_buffers_));
+  LITERT_RETURN_IF_ERROR(InitializeBuffers(output_buffers_));
   if (output_buffers_.size() != 1) {
     return absl::InvalidArgumentError(
         absl::StrCat("The Audio Adapter model must have exactly one output "
