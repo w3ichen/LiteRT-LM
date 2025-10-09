@@ -34,8 +34,8 @@ TEST(StopTokenDetectorTest, AddStopSequence) {
   EXPECT_EQ(absl::StatusCode::kInvalidArgument,
             detector.AddStopTokenSequence({}).code());
 
-  // Adding a repeated sequence should fail
-  EXPECT_EQ(absl::StatusCode::kAlreadyExists,
+  // Adding a repeated sequence should be a no-op.
+  EXPECT_EQ(absl::StatusCode::kOk,
             detector.AddStopTokenSequence({1, 2, 3}).code());
 
   EXPECT_TRUE(detector.AddStopTokenSequence({9}).ok());

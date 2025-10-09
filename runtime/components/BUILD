@@ -236,6 +236,7 @@ cc_library(
     hdrs = ["stop_token_detector.h"],
     deps = [
         "@com_google_absl//absl/log:absl_check",
+        "@com_google_absl//absl/log:absl_log",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings:str_format",

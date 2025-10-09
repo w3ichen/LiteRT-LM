@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "absl/log/absl_check.h"  // from @com_google_absl
+#include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/str_format.h"  // from @com_google_absl
@@ -58,9 +59,11 @@ absl::Status StopTokenDetector::AddStopTokenSequence(
   // Check if the sequence already exists
   if (std::find(stop_sequences_storage_.begin(), stop_sequences_storage_.end(),
                 stop_sequence) != stop_sequences_storage_.end()) {
-    return absl::AlreadyExistsError(
-        absl::StrFormat("Stop token sequence %s already exists.",
-                        PrintSequence(stop_sequence)));
+    ABSL_LOG(INFO) << absl::StrFormat(
+        "Stop token sequence %s already exists. Skipping "
+        "adding the stop token sequence.",
+        PrintSequence(stop_sequence));
+    return absl::OkStatus();
   }
 
   stop_sequences_storage_.push_back(stop_sequence);
