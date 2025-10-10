@@ -55,9 +55,12 @@ tool_name(x=1)
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -75,15 +78,21 @@ tool_2(y=2)
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
                 "tool_calls": [
                   {
-                    "name": "tool_1",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_1",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   },
                   {
-                    "name": "tool_2",
-                    "arguments": {
-                      "y": 2
+                    "type": "function",
+                    "function": {
+                      "name": "tool_2",
+                      "arguments": {
+                        "y": 2
+                      }
                     }
                   }
                 ]
@@ -108,9 +117,12 @@ tool_name(x=1)
                 ],
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -130,9 +142,12 @@ print(tool_name(x=1))
       IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -149,9 +164,12 @@ TEST(ParserUtilsTest, ParseJsonToolCall) {
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -172,15 +190,21 @@ TEST(ParserUtilsTest, ParseJsonParallelToolCalls) {
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
                 "tool_calls": [
                   {
-                    "name": "tool_1",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_1",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   },
                   {
-                    "name": "tool_2",
-                    "arguments": {
-                      "y": 2
+                    "type": "function",
+                    "function": {
+                      "name": "tool_2",
+                      "arguments": {
+                        "y": 2
+                      }
                     }
                   }
                 ]
@@ -205,9 +229,12 @@ TEST(ParserUtilsTest, ParseTextAndJsonToolCalls) {
                 ],
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -238,9 +265,12 @@ This is some more text.
                 ],
                 "tool_calls": [
                   {
-                    "name": "tool_1",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_1",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -261,31 +291,37 @@ tool_2(y=2)
                   /*code_fence_end=*/"\n```",
                   /*syntax_type=*/SyntaxType::kPython),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
-                "content": [
-                  {
-                    "type": "text",
-                    "text": "This is some text.\n"
-                  },
-                  {
-                    "type": "text",
-                    "text": "\nThis is some more text.\n"
-                  }
-                ],
-                "tool_calls": [
-                  {
-                    "name": "tool_1",
-                    "arguments": {
-                      "x": 1
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "This is some text.\n"
+                    },
+                    {
+                      "type": "text",
+                      "text": "\nThis is some more text.\n"
                     }
-                  },
-                  {
-                    "name": "tool_2",
-                    "arguments": {
-                      "y": 2
+                  ],
+                  "tool_calls": [
+                    {
+                      "type": "function",
+                      "function": {
+                        "name": "tool_1",
+                        "arguments": {
+                          "x": 1
+                        }
+                      }
+                    },
+                    {
+                      "type": "function",
+                      "function": {
+                        "name": "tool_2",
+                        "arguments": {
+                          "y": 2
+                        }
+                      }
                     }
-                  }
-                ]
-              })json")));
+                  ]
+                })json")));
 }
 
 TEST(ParserUtilsTest, ParseTextThenParallelToolCalls) {
@@ -307,15 +343,21 @@ tool_2(y=2)
                 ],
                 "tool_calls": [
                   {
-                    "name": "tool_1",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_1",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   },
                   {
-                    "name": "tool_2",
-                    "arguments": {
-                      "y": 2
+                    "type": "function",
+                    "function": {
+                      "name": "tool_2",
+                      "arguments": {
+                        "y": 2
+                      }
                     }
                   }
                 ]
@@ -347,15 +389,21 @@ This is some more text.
                 ],
                 "tool_calls": [
                   {
-                    "name": "tool_1",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_1",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   },
                   {
-                    "name": "tool_2",
-                    "arguments": {
-                      "y": 2
+                    "type": "function",
+                    "function": {
+                      "name": "tool_2",
+                      "arguments": {
+                        "y": 2
+                      }
                     }
                   }
                 ]
@@ -393,15 +441,21 @@ This is some more text.
                 ],
                 "tool_calls": [
                   {
-                    "name": "tool_1",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_1",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   },
                   {
-                    "name": "tool_2",
-                    "arguments": {
-                      "y": 2
+                    "type": "function",
+                    "function": {
+                      "name": "tool_2",
+                      "arguments": {
+                        "y": 2
+                      }
                     }
                   }
                 ]

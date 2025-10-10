@@ -125,7 +125,8 @@ absl::StatusOr<nlohmann::ordered_json> ParseTextAndToolCalls(
         return absl::InvalidArgumentError("Unsupported syntax type.");
       }
       for (const auto& tool_call : tool_calls) {
-        result["tool_calls"].push_back(tool_call);
+        result["tool_calls"].push_back(
+            {{"type", "function"}, {"function", tool_call}});
       }
     }
     text.clear();

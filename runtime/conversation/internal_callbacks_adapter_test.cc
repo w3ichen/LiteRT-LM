@@ -150,9 +150,12 @@ TEST_F(InternalCallbacksAdapterTest, ToolCall) {
                 "role": "assistant",
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -180,9 +183,12 @@ TEST_F(InternalCallbacksAdapterTest, TextAndToolCall) {
                             "role": "assistant",
                             "tool_calls": [
                               {
-                                "name": "tool_name",
-                                "arguments": {
-                                  "x": 1
+                                "type": "function",
+                                "function": {
+                                  "name": "tool_name",
+                                  "arguments": {
+                                    "x": 1
+                                  }
                                 }
                               }
                             ]
@@ -205,9 +211,12 @@ TEST_F(InternalCallbacksAdapterTest, SplitCodeFenceStart) {
                 "role": "assistant",
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -231,9 +240,12 @@ TEST_F(InternalCallbacksAdapterTest, TextBeforeSplitCodeFenceStart) {
                 "role": "assistant",
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -255,9 +267,12 @@ TEST_F(InternalCallbacksAdapterTest, ToolCallAfterSplitCodeFenceStart) {
                 "role": "assistant",
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -279,9 +294,12 @@ TEST_F(InternalCallbacksAdapterTest, TextOnBothSidesOfCodeFenceStart) {
                 "role": "assistant",
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -303,9 +321,12 @@ TEST_F(InternalCallbacksAdapterTest, SplitCodeFenceEnd) {
                 "role": "assistant",
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -327,9 +348,12 @@ TEST_F(InternalCallbacksAdapterTest, TextBeforeSplitCodeFenceEnd) {
                 "role": "assistant",
                 "tool_calls": [
                   {
-                    "name": "tool_name",
-                    "arguments": {
-                      "x": 1
+                    "type": "function",
+                    "function": {
+                      "name": "tool_name",
+                      "arguments": {
+                        "x": 1
+                      }
                     }
                   }
                 ]
@@ -351,9 +375,12 @@ TEST_F(InternalCallbacksAdapterTest, TextAfterSplitCodeFenceEnd) {
                             "role": "assistant",
                             "tool_calls": [
                               {
-                                "name": "tool_name",
-                                "arguments": {
-                                  "x": 1
+                                "type": "function",
+                                "function": {
+                                  "name": "tool_name",
+                                  "arguments": {
+                                    "x": 1
+                                  }
                                 }
                               }
                             ]
@@ -376,9 +403,12 @@ TEST_F(InternalCallbacksAdapterTest, OnNextTextOnBothSidesOfSplitCodeFenceEnd) {
                             "role": "assistant",
                             "tool_calls": [
                               {
-                                "name": "tool_name",
-                                "arguments": {
-                                  "x": 1
+                                "type": "function",
+                                "function": {
+                                  "name": "tool_name",
+                                  "arguments": {
+                                    "x": 1
+                                  }
                                 }
                               }
                             ]
@@ -402,15 +432,21 @@ TEST_F(InternalCallbacksAdapterTest, ParallelToolCalls) {
                   "role": "assistant",
                   "tool_calls": [
                     {
-                      "name": "tool_a",
-                      "arguments": {
-                        "x": 1
+                      "type": "function",
+                      "function": {
+                        "name": "tool_a",
+                        "arguments": {
+                          "x": 1
+                        }
                       }
                     },
                     {
-                      "name": "tool_b",
-                      "arguments": {
-                        "y": "z"
+                      "type": "function",
+                      "function": {
+                        "name": "tool_b",
+                        "arguments": {
+                          "y": "z"
+                        }
                       }
                     }
                   ]
@@ -434,9 +470,12 @@ TEST_F(InternalCallbacksAdapterTest, TwoConsecutiveToolCodeBlocks) {
                             "role": "assistant",
                             "tool_calls": [
                               {
-                                "name": "tool_a",
-                                "arguments": {
-                                  "x": 1
+                                "type": "function",
+                                "function": {
+                                  "name": "tool_a",
+                                  "arguments": {
+                                    "x": 1
+                                  }
                                 }
                               }
                             ]
@@ -445,9 +484,12 @@ TEST_F(InternalCallbacksAdapterTest, TwoConsecutiveToolCodeBlocks) {
                             "role": "assistant",
                             "tool_calls": [
                               {
-                                "name": "tool_b",
-                                "arguments": {
-                                  "y": "z"
+                                "type": "function",
+                                "function": {
+                                  "name": "tool_b",
+                                  "arguments": {
+                                    "y": "z"
+                                  }
                                 }
                               }
                             ]

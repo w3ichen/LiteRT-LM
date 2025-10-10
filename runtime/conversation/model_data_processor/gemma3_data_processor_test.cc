@@ -245,9 +245,12 @@ tool_name(x=1)
     ],
     "tool_calls": [
       {
-        "name": "tool_name",
-        "arguments": {
-          "x": 1
+        "type": "function",
+        "function": {
+          "name": "tool_name",
+          "arguments": {
+            "x": 1
+          }
         }
       }
     ]
@@ -474,15 +477,21 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolCalls) {
     ],
     "tool_calls": [
       {
-        "name": "tool1",
-        "arguments": {
-          "x": 1
+        "type": "function",
+        "function": {
+          "name": "tool1",
+          "arguments": {
+            "x": 1
+          }
         }
       },
       {
-        "name": "tool2",
-        "arguments": {
-          "y": "foo"
+        "type": "function",
+        "function": {
+          "name": "tool2",
+          "arguments": {
+            "y": "foo"
+          }
         }
       }
     ]
@@ -499,15 +508,21 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolCalls) {
   ],
   "tool_calls": [
     {
-      "name": "tool1",
-      "arguments": {
-        "x": "1"
+      "type": "function",
+      "function": {
+        "name": "tool1",
+        "arguments": {
+          "x": "1"
+        }
       }
     },
     {
-      "name": "tool2",
-      "arguments": {
-        "y": "\"foo\""
+      "type": "function",
+      "function": {
+        "name": "tool2",
+        "arguments": {
+          "y": "\"foo\""
+        }
       }
     }
   ]
@@ -606,15 +621,21 @@ TEST(Gemma3DataProcessorTest, RenderTemplateWithToolCalls) {
       "role": "assistant",
       "tool_calls": [
         {
-          "name": "get_weather",
-          "arguments": {
-            "location": "Paris"
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "arguments": {
+              "location": "Paris"
+            }
           }
         },
         {
-          "name": "get_weather",
-          "arguments": {
-            "location": "London"
+          "type": "function",
+          "function": {
+            "name": "get_weather",
+            "arguments": {
+              "location": "London"
+            }
           }
         }
       ]

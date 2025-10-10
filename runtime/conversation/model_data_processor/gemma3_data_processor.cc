@@ -108,18 +108,23 @@ absl::StatusOr<ordered_json> Gemma3DataProcessor::MessageToTemplateInput(
   if (message.contains("tool_calls")) {
     template_input["tool_calls"] = ordered_json::array();
     for (const auto& tool_call : message["tool_calls"]) {
+      if (!tool_call.contains("function")) {
+        continue;
+      }
+      const nlohmann::ordered_json& function = tool_call["function"];
       ordered_json tool_call_input = ordered_json::object();
-      tool_call_input["name"] = tool_call["name"];
+      tool_call_input["type"] = "function";
+      tool_call_input["function"]["name"] = function["name"];
 
-      if (tool_call.contains("arguments")) {
-        if (tool_call["arguments"].is_object()) {
-          for (const auto& [key, value] : tool_call["arguments"].items()) {
+      if (function.contains("arguments")) {
+        if (function["arguments"].is_object()) {
+          for (const auto& [key, value] : function["arguments"].items()) {
             ASSIGN_OR_RETURN(std::string formatted_value,
                              FormatValueAsPython(value));
-            tool_call_input["arguments"][key] = formatted_value;
+            tool_call_input["function"]["arguments"][key] = formatted_value;
           }
         } else {
-          tool_call_input["arguments"] = tool_call["arguments"];
+          tool_call_input["function"]["arguments"] = function["arguments"];
         }
       }
 

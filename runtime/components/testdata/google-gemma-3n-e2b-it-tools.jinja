@@ -58,6 +58,9 @@
     {%- if 'tool_calls' in message -%}
         {{- '```tool_code\n' -}}
         {%- for tool_call in message['tool_calls'] -%}
+            {%- if 'function' in tool_call -%}
+                {%- set tool_call = tool_call['function'] -%}
+            {%- endif -%}
             {{-  tool_call['name'] + '(' -}}
             {%- if 'arguments' in tool_call -%}
                 {%- for key in tool_call['arguments'] -%}
