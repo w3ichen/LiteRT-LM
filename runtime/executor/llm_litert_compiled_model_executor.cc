@@ -210,6 +210,27 @@ absl::Status LlmLiteRtCompiledModelExecutor::Prefill(
   }
   RET_CHECK_EQ(ids.size(), 0).SetCode(absl::StatusCode::kInternal)
       << "Work groups not covering the entire prefill input.";
+
+  // If requested, wait for prefill to complete, for example, by benchmark.
+  if (params.GetWaitForCompletion()) {
+    // A workaround to sync with backend especially for GPU backends is to do
+    // read-lock a small decode buffer, input_positions which most likely
+    // consists only of one value.
+    if (!signatures_.input_positions.empty() &&
+        decode_input_buffers_.contains(signatures_.input_positions)) {
+      ABSL_LOG(INFO) << "Waiting for prefill to complete.";
+      auto lock = ::litert::TensorBufferScopedLock::Create(
+            decode_input_buffers_[signatures_.input_positions],
+            TensorBuffer::LockMode::kRead);
+      if (!lock) {
+        ABSL_LOG(ERROR) << "Failed to lock decode input_positions as a "
+                        << "workaround to sync with backend.";
+      }
+    } else {
+      ABSL_LOG(WARNING) << "Ignore waiting for prefill to complete.";
+    }
+  }
+
   return absl::OkStatus();
 }
 

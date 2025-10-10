@@ -515,7 +515,8 @@ absl::StatusOr<int> Prefill(LlmExecutor& executor, ExecutorInputs& inputs,
   }
   const int last_token_id = ids_buffer_span.back();
   ExecutorPrefillParams params;
-  params.SetWaitForCompletion(wait_for_completion);
+  // Wait for prefill to complete if benchmark mode is enabled.
+  params.SetWaitForCompletion(wait_for_completion | benchmark_info.has_value());
   RETURN_IF_ERROR(executor.Prefill(inputs, params));
   if (benchmark_info.has_value()) {
     RETURN_IF_ERROR(benchmark_info->TimePrefillTurnEnd(ids_buffer_span.size()));
