@@ -30,12 +30,14 @@ TEST(LitertLmLoaderTest, InitializeWithSentencePieceFile) {
       std::filesystem::path(::testing::SrcDir()) /
       "litert_lm/runtime/testdata/test_lm.litertlm";
   auto model_file = ScopedFile::Open(model_path.string());
-  ASSERT_TRUE(model_file.ok());
+  EXPECT_TRUE(model_file.ok());
   LitertLmLoader loader(std::move(model_file.value()));
-  ASSERT_FALSE(loader.GetHuggingFaceTokenizer());
-  ASSERT_GT(loader.GetSentencePieceTokenizer()->Size(), 0);
-  ASSERT_GT(loader.GetTFLiteModel(ModelType::kTfLitePrefillDecode).Size(), 0);
-  ASSERT_GT(loader.GetLlmMetadata().Size(), 0);
+  EXPECT_FALSE(loader.GetHuggingFaceTokenizer());
+  EXPECT_GT(loader.GetSentencePieceTokenizer()->Size(), 0);
+  EXPECT_GT(loader.GetTFLiteModel(ModelType::kTfLitePrefillDecode).Size(), 0);
+  EXPECT_GT(loader.GetLlmMetadata().Size(), 0);
+  // Try to get non-existent TFLite model.
+  EXPECT_EQ(loader.GetTFLiteModel(ModelType::kTfLiteEmbedder).Size(), 0);
 }
 
 TEST(LitertLmLoaderTest, InitializeWithHuggingFaceFile) {

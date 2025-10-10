@@ -21,6 +21,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
@@ -47,8 +48,7 @@ struct BufferKey {
       : data_type(type), model_type(std::nullopt) {}
 
   // Constructor for TFLITE_MODEL_DATA case
-  explicit BufferKey(schema::AnySectionDataType type,
-                     ModelType model_type)
+  explicit BufferKey(schema::AnySectionDataType type, ModelType model_type)
       : data_type(type), model_type(model_type) {
     // Optional: Add an assertion here if 'type' MUST be TFLITE_MODEL_DATA for
     // model_t to be set
@@ -103,8 +103,14 @@ class LitertLmLoader {
 
   // Returns the TFLite model section buffer.
   litert::BufferRef<uint8_t> GetTFLiteModel(ModelType model_type) {
-    return section_buffers_[BufferKey(
-        schema::AnySectionDataType_TFLiteModel, model_type)];
+    if (section_buffers_.contains(
+            BufferKey(schema::AnySectionDataType_TFLiteModel, model_type))) {
+      return section_buffers_[BufferKey(schema::AnySectionDataType_TFLiteModel,
+                                        model_type)];
+    }
+    ABSL_LOG(WARNING) << "TFLite model type: " << ModelTypeToString(model_type)
+                      << " not found. Skipping.";
+    return litert::BufferRef<uint8_t>();
   };
 
   // Returns the tokenizer section buffer.

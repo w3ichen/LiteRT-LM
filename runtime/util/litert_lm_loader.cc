@@ -20,7 +20,6 @@
 #include <cstring>
 #include <memory>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -35,7 +34,6 @@
 #include "runtime/components/model_resources.h"
 #include "runtime/util/memory_mapped_file.h"
 #include "runtime/util/scoped_file.h"
-#include "runtime/util/status_macros.h"  // NOLINT
 #include "schema/core/litertlm_header_schema_generated.h"
 #include "schema/core/litertlm_read.h"
 
@@ -79,8 +77,7 @@ absl::Status LitertLmLoader::MapSections() {
     auto items = section->items();
     BufferKey buffer_key(section->data_type());
     // Extract the specific model type from the section items KeyValuePairs.
-    if (section->data_type() ==
-        schema::AnySectionDataType_TFLiteModel) {
+    if (section->data_type() == schema::AnySectionDataType_TFLiteModel) {
       bool found_model_type = false;
       std::string model_type;
       for (size_t j = 0; j < items->size(); ++j) {
