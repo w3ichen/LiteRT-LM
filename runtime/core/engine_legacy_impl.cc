@@ -34,6 +34,7 @@
 #include "runtime/components/preprocessor/audio_preprocessor_miniaudio.h"
 #include "runtime/components/preprocessor/image_preprocessor.h"
 #include "runtime/components/preprocessor/stb_image_preprocessor.h"
+#include "third_party/odml/infra/genai/inference/executor/llm_gpu_artisan_executor.h"
 #include "runtime/components/sentencepiece_tokenizer.h"
 #include "runtime/components/tokenizer.h"
 #include "runtime/core/session_factory.h"
@@ -64,8 +65,11 @@ namespace oi = ::odml::infra;
 absl::StatusOr<std::unique_ptr<LlmExecutor>> BuildExecutor(
     const oi::ExecutorModelResources& model_resources,
     const EngineSettings& engine_settings) {
-  if (!model_resources.model) {
-    return absl::InternalError("Failed to build TF_LITE_PREFILL_DECODE model.");
+  if ((engine_settings.GetMainExecutorSettings().GetBackend() !=
+      Backend::GPU_ARTISAN) && (!model_resources.model)) {
+    return absl::InternalError(
+        "TF_LITE_PREFILL_DECODE model is expected to exist when not using "
+        "GPU_ARTISAN backend. But it is null.");
   }
   // Create executor that creates and owns the interpreter and kv cache.
   std::unique_ptr<LlmExecutor> executor;
@@ -81,6 +85,17 @@ absl::StatusOr<std::unique_ptr<LlmExecutor>> BuildExecutor(
     ASSIGN_OR_RETURN(executor, oi::LlmLiteRTOpenClExecutor::Create(
                                    engine_settings.GetMainExecutorSettings(),
                                    model_resources));
+  } else if (engine_settings.GetMainExecutorSettings().GetBackend() ==
+             Backend::GPU_ARTISAN) {
+    if (model_resources.litert_lm_model_resources == nullptr) {
+      return absl::InternalError(
+          "Failed to build GPU_ARTISAN executor: "
+          "model_resources.litert_lm_model_resources is null. ");
+    }
+    ASSIGN_OR_RETURN(executor,
+                     oi::LlmGpuArtisanExecutor::Create(
+                         engine_settings.GetMainExecutorSettings(),
+                         *(model_resources.litert_lm_model_resources.get())));
   } else {
     return absl::InvalidArgumentError(
         absl::StrCat("Unsupported backend: ",
