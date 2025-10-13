@@ -437,7 +437,7 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
   // Clear the prompt templates for multi-turns usage where Conversation would
   // take care of the prompt templates.
   if (settings.multi_turns) {
-    session_config.GetMutablePromptTemplates().Clear();
+    session_config.GetMutablePromptTemplates().mutable_user()->set_prefix("");
   }
 
   ABSL_LOG(INFO) << "Creating session";

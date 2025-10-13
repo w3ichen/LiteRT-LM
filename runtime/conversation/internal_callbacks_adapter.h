@@ -43,6 +43,7 @@ namespace litert::lm {
 class InternalCallbacksAdapter : public InferenceCallbacks {
  public:
   using CompleteMessageCallback = std::function<void(const Message& message)>;
+  using CancelCallback = std::function<void()>;
 
   // Creates an instance of `InternalCallbacksAdapter`.
   //
@@ -60,6 +61,9 @@ class InternalCallbacksAdapter : public InferenceCallbacks {
   // finished successfully.
   void SetCompleteMessageCallback(
       CompleteMessageCallback complete_message_callback);
+
+  // Sets a callback to be called when the process is cancelled.
+  void SetCancelCallback(CancelCallback cancel_callback);
 
   // Called when a new response is generated.
   void OnNext(const Responses& responses) override;
@@ -83,6 +87,7 @@ class InternalCallbacksAdapter : public InferenceCallbacks {
   ModelDataProcessor* absl_nonnull model_data_processor_;
   std::unique_ptr<MessageCallbacks> user_callbacks_;
   CompleteMessageCallback complete_message_callback_;
+  CancelCallback cancel_callback_;
   DataProcessorArguments processor_args_;
   std::string accumulated_response_text_;
   size_t cursor_ = 0;

@@ -129,14 +129,8 @@ class Conversation {
   // - The benchmark info for the conversation.
   absl::StatusOr<BenchmarkInfo> GetBenchmarkInfo();
 
-  // Cancels the ongoing inference process, for asynchronous inference. Note
-  // that if this function is called, the inference process will return with a
-  // kCancelled error. The Conversation could still be used after afterwards.
-  //
-  // TODO(b/450903294) - Ideally we should check whether cancel take affect, and
-  // if yes, we should rollback history, but currently there is no such info
-  // from Session. Here we just pop the last message, assuming cancellation is
-  // successful. Note: the underlying Session is not rollbacked, so the message
+  // Cancels the ongoing inference process, for asynchronous inference.
+  // Note: the underlying Session is not rollbacked, so the message
   // from the user is actually sent to the LLM and processed for prefill.
   void CancelProcess();
 

@@ -225,6 +225,20 @@ class StreamingTestCallbacks : public InferenceCallbacks {
   absl::Notification& done_;
 };
 
+class CancelledTestCallbacks : public StreamingTestCallbacks {
+ public:
+  CancelledTestCallbacks(absl::Status& status, std::vector<std::string>& texts,
+                         absl::Notification& done)
+      : StreamingTestCallbacks(status, texts, done) {}
+
+  void OnNext(const Responses& responses) override {
+    // Wait for a while to allow cancellation happens in the middle of the
+    // decode step.
+    absl::SleepFor(absl::Milliseconds(50));
+    StreamingTestCallbacks::OnNext(responses);
+  }
+};
+
 TEST_F(SessionBasicTest, RunPrefill) {
   const std::vector<std::vector<int>> stop_token_ids = {{2294}};
   SessionConfig session_config = SessionConfig::CreateDefault();
@@ -1496,7 +1510,7 @@ TEST_F(SessionBasicTest, GenerateContentStreamWithCancellation) {
   absl::Notification done;
 
   (*session)
-      ->GenerateContentStream(inputs, std::make_unique<StreamingTestCallbacks>(
+      ->GenerateContentStream(inputs, std::make_unique<CancelledTestCallbacks>(
                                           status, responses, done))
       .IgnoreError();
 
@@ -1510,6 +1524,99 @@ TEST_F(SessionBasicTest, GenerateContentStreamWithCancellation) {
   done.WaitForNotification();
   EXPECT_THAT(status, testing::status::StatusIs(absl::StatusCode::kCancelled));
 }
+
+class SessionBasicCancellationTest : public testing::TestWithParam<bool> {
+ protected:
+  void SetUp() override {
+    auto tokenizer = ExtendedTokenizer::CreateFromFile(
+        (std::filesystem::path(::testing::SrcDir()) /
+         std::string(kTestdataDir) / "sentencepiece.model")
+            .string());
+    ASSERT_OK(tokenizer);
+    tokenizer.value()->SetExtendedToken(256000, "<start_of_audio>");
+    tokenizer_ = std::move(*tokenizer);
+    sampler_params_.set_type(proto::SamplerParameters::TYPE_UNSPECIFIED);
+    // Creating the thread pool of a single thread to execute the works.
+    worker_thread_pool_ = std::make_unique<ThreadPool>(/*name_prefix=*/"engine",
+                                                       /*max_num_threads=*/1);
+  }
+  bool use_benchmark_info_ = GetParam();
+  std::unique_ptr<Tokenizer> tokenizer_;
+  proto::SamplerParameters sampler_params_;
+  std::unique_ptr<ThreadPool> worker_thread_pool_;
+};
+
+TEST_P(SessionBasicCancellationTest,
+       GenerateContentStreamCancelThenGenerateWithBenchmark) {
+  // Configure the executor to have a delay to simulate a long-running task.
+  ASSERT_OK_AND_ASSIGN(
+      auto fake_executor,
+      CreateFakeLlmExecutor(
+          // "Hello World!"
+          /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294},
+                              // The second prefill doesn't have bos token.
+                              {90, 547, 58, 735, 210, 466, 2294}},
+          // "How's it going?"
+          /*decode_tokens=*/{
+              {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
+  fake_executor->SetDecodeDelay(absl::Milliseconds(200));
+
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+
+  std::optional<BenchmarkInfo> benchmark_info;
+  bool use_benchmark_info = GetParam();
+  if (use_benchmark_info) {
+    proto::BenchmarkParams benchmark_params;
+    benchmark_info.emplace(benchmark_params);
+  }
+  auto session = SessionBasic::Create(
+      fake_executor.get(), tokenizer_.get(),
+      /*image_preprocessor=*/nullptr,
+      /*vision_executor=*/nullptr, /*audio_preprocessor=*/nullptr,
+      /*audio_executor=*/nullptr, session_config, benchmark_info,
+      worker_thread_pool_.get());
+  ASSERT_OK(session);
+
+  std::vector<InputData> inputs;
+  inputs.emplace_back(InputText("Hello World!"));
+
+  absl::Status status;
+  std::vector<std::string> responses;
+  absl::Notification done1;
+
+  (*session)
+      ->GenerateContentStream(inputs, std::make_unique<CancelledTestCallbacks>(
+                                          status, responses, done1))
+      .IgnoreError();
+
+  // Cancel the process.
+  (*session)->CancelProcess();
+
+  // Wait for the callbacks to be done.
+  done1.WaitForNotification();
+  EXPECT_THAT(status, testing::status::StatusIs(absl::StatusCode::kCancelled));
+
+  // Generate again after cancellation.
+  // The second generation should succeed.
+  status = absl::OkStatus();
+  responses.clear();
+  absl::Notification done2;
+  (*session)
+      ->GenerateContentStream(inputs, std::make_unique<CancelledTestCallbacks>(
+                                          status, responses, done2))
+      .IgnoreError();
+  done2.WaitForNotification();
+  EXPECT_OK(status);
+}
+
+INSTANTIATE_TEST_SUITE_P(SessionBasicCancellationTest,
+                         SessionBasicCancellationTest, testing::Bool(),
+                         testing::PrintToStringParamName());
 
 TEST_F(SessionBasicTest, GenerateContentStreamOnCancelledSession) {
   ASSERT_OK_AND_ASSIGN(

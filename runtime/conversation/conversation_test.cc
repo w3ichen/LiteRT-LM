@@ -205,7 +205,39 @@ TEST(ConversationTest, GetBenchmarkInfo) {
   EXPECT_EQ(benchmark_info_2.GetTotalPrefillTurns(), 2);
 }
 
-TEST(ConversationTest, CancelProcess) {
+class CancelledMessageCallbacks : public MessageCallbacks {
+ public:
+  explicit CancelledMessageCallbacks(absl::Status& status,
+                                     absl::Notification& done)
+      : status_(status), done_(done) {}
+
+  void OnError(const absl::Status& status) override {
+    status_ = status;
+    done_.Notify();
+  }
+  void OnMessage(const Message& message) override {
+    // Wait for a short time to slow down the decoding process, so that the
+    // cancellation can be triggered in the middle of decoding.
+    absl::SleepFor(absl::Milliseconds(100));
+  }
+
+  void OnComplete() override {
+    status_ = absl::OkStatus();
+    done_.Notify();
+  }
+
+ private:
+  absl::Status& status_;
+  absl::Notification& done_;
+};
+
+class ConversationCancellationTest : public testing::TestWithParam<bool> {
+ protected:
+  bool use_benchmark_info_ = GetParam();
+};
+
+TEST_P(ConversationCancellationTest, CancelProcessWithBenchmarkInfo) {
+  bool use_benchmark_info = use_benchmark_info_;
   ASSERT_OK_AND_ASSIGN(auto model_assets,
                        ModelAssets::Create(GetTestdataPath(kTestLlmPath)));
   ASSERT_OK_AND_ASSIGN(auto engine_settings, EngineSettings::CreateDefault(
@@ -214,37 +246,15 @@ TEST(ConversationTest, CancelProcess) {
   // Set a large max num tokens to ensure the decoding is not finished before
   // cancellation.
   engine_settings.GetMutableMainExecutorSettings().SetMaxNumTokens(20);
+  if (use_benchmark_info) {
+    proto::BenchmarkParams benchmark_params;
+    engine_settings.GetMutableBenchmarkParams() = benchmark_params;
+  }
   ASSERT_OK_AND_ASSIGN(auto engine, Engine::CreateEngine(engine_settings));
   ASSERT_OK_AND_ASSIGN(auto session,
                        engine->CreateSession(SessionConfig::CreateDefault()));
   ASSERT_OK_AND_ASSIGN(auto conversation,
                        Conversation::Create(std::move(session)));
-
-  class CancelledMessageCallbacks : public MessageCallbacks {
-   public:
-    explicit CancelledMessageCallbacks(absl::Status& status,
-                                       absl::Notification& done)
-        : status_(status), done_(done) {}
-
-    void OnError(const absl::Status& status) override {
-      status_ = status;
-      done_.Notify();
-    }
-    void OnMessage(const Message& message) override {
-      // Wait for a short time to slow down the decoding process, so that the
-      // cancellation can be triggered in the middle of decoding.
-      absl::SleepFor(absl::Milliseconds(100));
-    }
-
-    void OnComplete() override {
-      status_ = absl::OkStatus();
-      done_.Notify();
-    }
-
-   private:
-    absl::Status& status_;
-    absl::Notification& done_;
-  };
 
   absl::Status status;
   absl::Notification done_1;
@@ -287,7 +297,15 @@ TEST(ConversationTest, CancelProcess) {
   EXPECT_THAT(std::holds_alternative<JsonMessage>(history[1]),
               testing::IsTrue());
   EXPECT_EQ(std::get<JsonMessage>(history[1])["role"], "assistant");
+
+  conversation->CancelProcess();
+  // No op after cancellation again.
+  EXPECT_THAT(conversation->GetHistory().size(), 2);
 }
+
+INSTANTIATE_TEST_SUITE_P(ConversationCancellationTest,
+                         ConversationCancellationTest, testing::Bool(),
+                         testing::PrintToStringParamName());
 
 }  // namespace
 }  // namespace litert::lm

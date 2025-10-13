@@ -14,6 +14,7 @@
 
 #include "runtime/core/session_basic.h"
 
+#include <atomic>
 #include <cstddef>
 #include <cstring>
 #include <memory>
@@ -669,9 +670,11 @@ absl::Status SessionBasic::GenerateContentStream(
    public:
     PrefillCallbacks(SessionBasic* session,
                      std::unique_ptr<InferenceCallbacks> next_callbacks,
+                     std::atomic<bool>* cancelled,
                      const DecodeConfig& decode_config)
         : session_(session),
           next_callbacks_(std::move(next_callbacks)),
+          cancelled_(cancelled),
           decode_config_(decode_config) {}
 
     void OnNext(const Responses& responses) override {
@@ -683,6 +686,14 @@ absl::Status SessionBasic::GenerateContentStream(
     }
 
     void OnDone() override {
+      if (cancelled_ != nullptr && cancelled_->load()) {
+        if (*cancelled_) {
+          next_callbacks_->OnError(
+              absl::CancelledError("CancelProcess is called during prefill. "
+                                   "Skip the following decode call."));
+          return;
+        }
+      }
       absl::Status status =
           session_->RunDecodeAsync(std::move(next_callbacks_), decode_config_);
       if (!status.ok()) {
@@ -693,11 +704,12 @@ absl::Status SessionBasic::GenerateContentStream(
    private:
     SessionBasic* session_;
     mutable std::unique_ptr<InferenceCallbacks> next_callbacks_;
+    std::atomic<bool>* cancelled_;  // Not owned.
     DecodeConfig decode_config_;
   };
 
   auto prefill_callbacks = std::make_unique<PrefillCallbacks>(
-      this, std::move(callbacks), decode_config);
+      this, std::move(callbacks), &cancelled_, decode_config);
   RETURN_IF_ERROR(RunPrefillAsync(contents, std::move(prefill_callbacks)));
   return absl::OkStatus();
 }

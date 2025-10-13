@@ -200,6 +200,12 @@ absl::Status Conversation::SendMessageStream(
   internal_callbacks_adapter->SetCompleteMessageCallback(
       std::move(complete_message_callback));
 
+  InternalCallbacksAdapter::CancelCallback cancel_callback = [this]() {
+    absl::MutexLock lock(&this->history_mutex_);  // NOLINT
+    this->history_.pop_back();
+  };
+  internal_callbacks_adapter->SetCancelCallback(std::move(cancel_callback));
+
   RETURN_IF_ERROR(session_->GenerateContentStream(
       session_inputs, std::move(internal_callbacks_adapter),
       DecodeConfig::CreateDefault()));
@@ -210,14 +216,6 @@ absl::StatusOr<BenchmarkInfo> Conversation::GetBenchmarkInfo() {
   return session_->GetBenchmarkInfo();
 }
 
-void Conversation::CancelProcess() {
-  session_->CancelProcess();
-  // TODO(b/450903294) - Ideally we should check whether cancel take affect, and
-  // if yes, we should rollback history, but currently there is no such info
-  // from Session. Here we just pop the last message, assuming cancellation is
-  // successful.
-  absl::MutexLock lock(&history_mutex_);  // NOLINT
-  history_.pop_back();
-}
+void Conversation::CancelProcess() { session_->CancelProcess(); }
 
 }  // namespace litert::lm

@@ -66,6 +66,11 @@ void InternalCallbacksAdapter::SetCompleteMessageCallback(
   complete_message_callback_ = complete_message_callback;
 }
 
+void InternalCallbacksAdapter::SetCancelCallback(
+    CancelCallback cancel_callback) {
+  cancel_callback_ = cancel_callback;
+}
+
 void InternalCallbacksAdapter::OnNext(const Responses& responses) {
   const auto& response_text = responses.GetResponseTextAt(0);
   if (!response_text.ok()) {
@@ -107,6 +112,9 @@ void InternalCallbacksAdapter::OnError(const absl::Status& status) {
     ABSL_LOG(INFO) << "Maximum kv-cache size reached.";
     OnDone();
     return;
+  }
+  if (absl::IsCancelled(status) && cancel_callback_) {
+    cancel_callback_();
   }
   user_callbacks_->OnError(status);
 }

@@ -344,6 +344,11 @@ absl::StatusOr<Responses> DecodeLoop(
                              constraint);
   while (true) {
     if (cancelled != nullptr && cancelled->load()) {
+      if (benchmark_info.has_value()) {
+        // If the process is cancelled, we need to end this benchmark phase.
+        RETURN_IF_ERROR(benchmark_info->TimeDecodeTurnEnd(
+            num_decode_steps * num_output_candidates));
+      }
       if (is_streaming) {
         callbacks.value()->OnError(absl::CancelledError("Process cancelled."));
       }

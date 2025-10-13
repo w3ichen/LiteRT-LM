@@ -65,12 +65,16 @@ class BytePairEncodingTokenizer : public Tokenizer {
 class TestCallbacks : public InferenceCallbacks {
  public:
   explicit TestCallbacks(std::vector<std::string>& responses,
-                         absl::Status& status, bool& done)
+                         absl::Status& status, bool& done,
+                         bool delay_on_next = false)
       : responses_(responses), status_(status), done_(done) {}
   void OnNext(const Responses& responses) override {
     EXPECT_FALSE(done_);
     for (int i = 0; i < responses.GetNumOutputCandidates(); ++i) {
       responses_[i] += *(responses.GetResponseTextAt(i));
+    }
+    if (delay_on_next_) {
+      absl::SleepFor(absl::Milliseconds(50));
     }
   }
 
@@ -89,6 +93,7 @@ class TestCallbacks : public InferenceCallbacks {
   std::vector<std::string>& responses_;
   absl::Status& status_;
   bool& done_;
+  bool delay_on_next_;
 };
 
 class PipelineTest : public testing::Test {
@@ -643,7 +648,8 @@ TEST_F(PipelineCustomSamplingTest,
         *delayed_executor, *tokenizer_, stop_token_detector,
         /*num_output_candidates=*/2, *sampler, *decoded_ids,
         /*constraint=*/std::nullopt, benchmark_info,
-        std::make_unique<TestCallbacks>(responses, callbacks_status, done),
+        std::make_unique<TestCallbacks>(responses, callbacks_status, done,
+                                        /*delay_on_next=*/true),
         &cancelled);
   }));
 
