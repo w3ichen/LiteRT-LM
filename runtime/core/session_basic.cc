@@ -529,9 +529,10 @@ absl::Status SessionBasic::RunPrefillAsync(
 absl::StatusOr<Responses> SessionBasic::DecodeInternal(
     const DecodeConfig& decode_config) {
   if (sampler_ == nullptr) {
-    ASSIGN_OR_RETURN(auto responses,
-                     Decode(executor_, tokenizer_, stop_token_detector_,
-                            benchmark_info_, &cancelled_));
+    ASSIGN_OR_RETURN(
+        auto responses,
+        Decode(executor_, tokenizer_, stop_token_detector_,
+               decode_config.GetConstraint(), benchmark_info_, &cancelled_));
     return responses;
   } else {
     std::vector<int> decoded_ids(session_config_.GetNumOutputCandidates(),
@@ -542,9 +543,7 @@ absl::StatusOr<Responses> SessionBasic::DecodeInternal(
         auto responses,
         DecodeCustomSampling(executor_, tokenizer_, stop_token_detector_,
                              /*num_output_candidates=*/1, *sampler_,
-                             *decoded_ids_buffer,
-                             /*constraint=*/
-                             std::make_optional(decode_config.GetConstraint()),
+                             *decoded_ids_buffer, decode_config.GetConstraint(),
                              benchmark_info_, &cancelled_));
     return responses;
   }
@@ -555,6 +554,7 @@ absl::Status SessionBasic::DecodeInternalStreaming(
     const DecodeConfig& decode_config) {
   if (sampler_ == nullptr) {
     RETURN_IF_ERROR(DecodeStreaming(executor_, tokenizer_, stop_token_detector_,
+                                    decode_config.GetConstraint(),
                                     benchmark_info_, std::move(callbacks),
                                     &cancelled_));
   } else {
@@ -565,8 +565,8 @@ absl::Status SessionBasic::DecodeInternalStreaming(
     RETURN_IF_ERROR(DecodeCustomSamplingStreaming(
         executor_, tokenizer_, stop_token_detector_,
         /*num_output_candidates=*/1, *sampler_, *decoded_ids_buffer,
-        /*constraint=*/std::make_optional(decode_config.GetConstraint()),
-        benchmark_info_, std::move(callbacks), &cancelled_));
+        decode_config.GetConstraint(), benchmark_info_, std::move(callbacks),
+        &cancelled_));
   }
   return absl::OkStatus();
 }

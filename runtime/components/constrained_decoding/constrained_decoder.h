@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "absl/status/status.h"  // from @com_google_absl
+#include "absl/types/span.h"  // from @com_google_absl
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
 #include "runtime/components/constrained_decoding/constraint.h"
 
@@ -70,6 +71,9 @@ class ConstrainedDecoder {
   // token is invalid for its corresponding state.
   absl::Status UpdateConstraintState(
       const ::litert::TensorBuffer& next_token_ids);
+
+  // Same as above, but takes a span of token ids instead of a tensor buffer.
+  absl::Status UpdateConstraintState(absl::Span<int> next_token_ids);
 
   // Masks the input logits tensor based on the current constraint state of
   // each sequence in the batch.

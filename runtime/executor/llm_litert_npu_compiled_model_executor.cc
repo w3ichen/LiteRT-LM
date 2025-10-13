@@ -938,7 +938,16 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::Prefill(
 }
 
 absl::Status LlmLiteRtNpuCompiledModelExecutor::Decode(
-    TensorBuffer& output_tokens) {
+    ::litert::TensorBuffer& output_tokens) {
+  return Decode(output_tokens, ExecutorDecodeParams());
+}
+
+absl::Status LlmLiteRtNpuCompiledModelExecutor::Decode(
+    TensorBuffer& output_tokens, const ExecutorDecodeParams& decode_params) {
+  if (decode_params.HasConstraintDecoder()) {
+    return absl::UnimplementedError(
+        "Constrained decoding is not supported on NPU.");
+  }
   auto start = absl::Now();
   ::litert::TensorBuffer& decoded_logits =
       llm_inference_context_

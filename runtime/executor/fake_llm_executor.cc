@@ -14,6 +14,8 @@
 
 #include "runtime/executor/fake_llm_executor.h"
 
+#include <algorithm>
+#include <iterator>
 #include <limits>
 #include <optional>
 #include <utility>
@@ -50,6 +52,33 @@ void DecodeIdsToLogits(const std::vector<int>& ids, int vocab_size,
         (*logits_span)[index] = std::numeric_limits<float>::lowest();
       }
     }
+  }
+}
+
+// Converts the given logits TensorBuffer to ids TensorBuffer. If no token is
+// selected, use the last token in the decode tokens set which is the EOS token.
+void DecodeLogitsToIds(int batch_size, int vocab_size,
+                       ::litert::TensorBuffer& output_tokens,
+                       ::litert::TensorBuffer& output_logits,
+                       const std::vector<std::vector<int>>& decode_tokens_set) {
+  auto masked_logits_span = ReferTensorBufferAsSpan<float>(output_logits);
+  auto tokens_span = ReferTensorBufferAsSpan<int>(output_tokens);
+  for (int i = 0; i < batch_size; ++i) {
+    auto batch_start = masked_logits_span->begin() + i * vocab_size;
+    auto batch_end = batch_start + vocab_size;
+
+    auto max_it = std::max_element(batch_start, batch_end);
+
+    int best_token_id;
+    // Check if any logit was greater than the minimum value.
+    if (max_it != batch_end && *max_it > std::numeric_limits<float>::lowest()) {
+      best_token_id = std::distance(batch_start, max_it);
+    } else {
+      // If all logits are std::numeric_limits<float>::lowest(),
+      // default to the last token in the decode tokens set (EOS token).
+      best_token_id = decode_tokens_set.back().back();
+    }
+    (*tokens_span)[i] = best_token_id;
   }
 }
 
@@ -138,6 +167,12 @@ absl::Status FakeLlmExecutor::Prefill(
 }
 
 absl::Status FakeLlmExecutor::Decode(::litert::TensorBuffer& output_tokens) {
+  return Decode(output_tokens, ExecutorDecodeParams());
+}
+
+absl::Status FakeLlmExecutor::Decode(
+    ::litert::TensorBuffer& output_tokens,
+    const ExecutorDecodeParams& decode_params) {
   TryDecodeDelay();
   RETURN_IF_ERROR(decode_status_);
   if (decode_times_ >= decode_tokens_set_.size()) {
@@ -146,9 +181,43 @@ absl::Status FakeLlmExecutor::Decode(::litert::TensorBuffer& output_tokens) {
         "expected decode tokens.",
         decode_times_));
   }
-  auto tokens_span = ReferTensorBufferAsSpan<int>(output_tokens);
-  for (int i = 0; i < decode_tokens_set_[decode_times_].size(); ++i) {
-    (*tokens_span)[i] = decode_tokens_set_[decode_times_][i];
+  if (decode_params.HasConstraintDecoder()) {
+    // If constraint decoder is set, we will decode logits and apply the mask
+    // from the constraint decoder to generate the final output tokens.
+    auto constraint_decoder = decode_params.GetConstraintDecoder();
+    // Get the last token ids from the last prefill or decode call.
+    LITERT_ASSIGN_OR_RETURN(auto last_token_ids,
+                            CreateTensorBuffer<int>({batch_size_, 1}));
+    auto last_token_ids_span = ReferTensorBufferAsSpan<int>(last_token_ids);
+    if (decode_times_ == 0) {
+      const auto& last_prefill_tokens = prefill_tokens_set_.back();
+      int seq_len = last_prefill_tokens.size() / batch_size_;
+      for (int i = 0; i < batch_size_; ++i) {
+        (*last_token_ids_span)[i] =
+            last_prefill_tokens[i * seq_len + seq_len - 1];
+      }
+    } else {
+      const auto& last_decode_tokens = decode_tokens_set_[decode_times_ - 1];
+      for (int i = 0; i < batch_size_; ++i) {
+        (*last_token_ids_span)[i] = last_decode_tokens[i];
+      }
+    }
+    // Update the constraint state with the last token ids.
+    RETURN_IF_ERROR(constraint_decoder->UpdateConstraintState(last_token_ids));
+    LITERT_ASSIGN_OR_RETURN(
+        auto output_logits,
+        CreateTensorBuffer<float>({batch_size_, 1, vocab_size_}));
+    DecodeIdsToLogits(decode_tokens_set_[decode_times_], vocab_size_,
+                      output_logits);
+    // Apply the mask from the constraint decoder to the logits.
+    RETURN_IF_ERROR(constraint_decoder->MaskLogits(output_logits));
+    DecodeLogitsToIds(batch_size_, vocab_size_, output_tokens, output_logits,
+                      decode_tokens_set_);
+  } else {
+    auto tokens_span = ReferTensorBufferAsSpan<int>(output_tokens);
+    for (int i = 0; i < decode_tokens_set_[decode_times_].size(); ++i) {
+      (*tokens_span)[i] = decode_tokens_set_[decode_times_][i];
+    }
   }
   decode_times_++;
   current_step_++;

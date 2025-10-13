@@ -25,6 +25,7 @@
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
+#include "runtime/components/constrained_decoding/constrained_decoder.h"
 #include "runtime/util/logging_tensor_buffer.h"
 
 namespace litert::lm {
@@ -539,6 +540,33 @@ std::ostream& operator<<(std::ostream& os,
     os << max_prefill_sequence_length.value();
   } else {
     os << "nullopt";
+  }
+  os << "\n"
+     << "}";
+  return os;
+}
+
+// --- ExecutorDecodeParams Implementation ---
+void ExecutorDecodeParams::SetConstraintDecoder(
+    ConstrainedDecoder* constraint) {
+  constraint_decoder_ = constraint;
+}
+
+bool ExecutorDecodeParams::HasConstraintDecoder() const {
+  return constraint_decoder_ != nullptr;
+}
+
+ConstrainedDecoder* ExecutorDecodeParams::GetConstraintDecoder() const {
+  return constraint_decoder_;
+}
+
+std::ostream& operator<<(std::ostream& os, const ExecutorDecodeParams& params) {
+  os << "ExecutorDecodeParams: {\n";
+  os << kFieldIndent << "ConstraintDecoder: ";
+  if (params.HasConstraintDecoder()) {
+    os << params.GetConstraintDecoder();
+  } else {
+    os << "not set";
   }
   os << "\n"
      << "}";

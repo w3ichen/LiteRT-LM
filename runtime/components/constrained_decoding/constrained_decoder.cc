@@ -32,14 +32,19 @@ absl::Status ConstrainedDecoder::UpdateConstraintState(
     const ::litert::TensorBuffer& next_token_ids) {
   LITERT_ASSIGN_OR_RETURN(auto next_token_ids_span,
                           ReferTensorBufferAsSpan<int>(next_token_ids));
-  RET_CHECK_EQ(next_token_ids_span.size(), batch_size_)
-      << "Batch size [" << next_token_ids_span.size()
+  return UpdateConstraintState(next_token_ids_span);
+}
+
+absl::Status ConstrainedDecoder::UpdateConstraintState(
+    absl::Span<int> next_token_ids) {
+  RET_CHECK_EQ(next_token_ids.size(), batch_size_)
+      << "Batch size [" << next_token_ids.size()
       << "] does not match the expected batch size [" << batch_size_ << "].";
   for (int i = 0; i < batch_size_; ++i) {
     auto& constraint_state = constraint_states_[i];
     ASSIGN_OR_RETURN(
         constraint_state,
-        constraint_->ComputeNext(*constraint_state, next_token_ids_span[i]));
+        constraint_->ComputeNext(*constraint_state, next_token_ids[i]));
     if (constraint_->IsEnded(*constraint_state)) {
       constraint_state = constraint_->Start();
     }

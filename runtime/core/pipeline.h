@@ -54,11 +54,13 @@ absl::StatusOr<int> Prefill(LlmExecutor& executor, ExecutorInputs& inputs,
 // - executor: The executor that call the core LLM model.
 // - tokenizer: The tokenizer to decode the token ids into text.
 // - stop_token_ids: The token ids to stop the decoding process.
+// - constraint: The constraint to constrain the decoding process.
 // - benchmark_info: The benchmark info to record the performance metrics.
 // - cancelled: A pointer to an atomic boolean. If the boolean is set to true,
 //   the decoding process will be cancelled.
 absl::StatusOr<Responses> Decode(LlmExecutor& executor, Tokenizer& tokenizer,
                                  const StopTokenDetector& stop_token_detector,
+                                 Constraint* constraint,
                                  std::optional<BenchmarkInfo>& benchmark_info,
                                  std::atomic<bool>* cancelled = nullptr);
 
@@ -70,6 +72,7 @@ absl::StatusOr<Responses> Decode(LlmExecutor& executor, Tokenizer& tokenizer,
 //   the decoding process will be cancelled.
 absl::Status DecodeStreaming(LlmExecutor& executor, Tokenizer& tokenizer,
                              const StopTokenDetector& stop_token_detector,
+                             Constraint* constraint,
                              std::optional<BenchmarkInfo>& benchmark_info,
                              std::unique_ptr<InferenceCallbacks> callbacks,
                              std::atomic<bool>* cancelled = nullptr);
@@ -89,8 +92,7 @@ absl::Status DecodeStreaming(LlmExecutor& executor, Tokenizer& tokenizer,
 absl::StatusOr<Responses> DecodeCustomSampling(
     LlmExecutor& executor, Tokenizer& tokenizer,
     const StopTokenDetector& stop_token_detector, int num_output_candidates,
-    Sampler& sampler, litert::TensorBuffer& decoded_ids,
-    std::optional<Constraint*> constraint,
+    Sampler& sampler, litert::TensorBuffer& decoded_ids, Constraint* constraint,
     std::optional<BenchmarkInfo>& benchmark_info,
     std::atomic<bool>* cancelled = nullptr);
 
@@ -103,8 +105,7 @@ absl::StatusOr<Responses> DecodeCustomSampling(
 absl::Status DecodeCustomSamplingStreaming(
     LlmExecutor& executor, Tokenizer& tokenizer,
     const StopTokenDetector& stop_token_detector, int num_output_candidates,
-    Sampler& sampler, litert::TensorBuffer& decoded_ids,
-    std::optional<Constraint*> constraint,
+    Sampler& sampler, litert::TensorBuffer& decoded_ids, Constraint* constraint,
     std::optional<BenchmarkInfo>& benchmark_info,
     std::unique_ptr<InferenceCallbacks> callbacks,
     std::atomic<bool>* cancelled = nullptr);

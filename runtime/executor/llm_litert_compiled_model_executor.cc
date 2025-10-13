@@ -427,12 +427,37 @@ absl::StatusOr<int> LlmLiteRtCompiledModelExecutor::GetIdToDecode(
 
 absl::Status LlmLiteRtCompiledModelExecutor::Decode(
     ::litert::TensorBuffer& output_tokens) {
+  return Decode(output_tokens, ExecutorDecodeParams());
+}
 
-  ASSIGN_OR_RETURN(decoded_logits_, DecodeLogits(ExecutorInputs()));
+absl::Status LlmLiteRtCompiledModelExecutor::Decode(
+    ::litert::TensorBuffer& output_tokens,
+    const ExecutorDecodeParams& decode_params) {
+
+  auto inputs = ExecutorInputs();
+
+  // Update constraint state based on the current token id before the
+  // decode.
+  if (decode_params.HasConstraintDecoder()) {
+    ASSIGN_OR_RETURN(int last_token_id, GetIdToDecode(inputs));
+    RETURN_IF_ERROR(decode_params.GetConstraintDecoder()->UpdateConstraintState(
+        absl::MakeSpan(&last_token_id, 1)));
+  }
+
+  // Decode section.
+  ASSIGN_OR_RETURN(decoded_logits_, DecodeLogits(inputs));
   LITERT_ASSIGN_OR_RETURN(auto size, decoded_logits_.PackedSize());
   if (decoded_logits_vector_.empty()) {
     decoded_logits_vector_ = std::vector<float>(size / sizeof(float));
   }
+
+  // Mask logits based on the current constraint state.
+  if (decode_params.HasConstraintDecoder()) {
+    RETURN_IF_ERROR(
+        decode_params.GetConstraintDecoder()->MaskLogits(decoded_logits_));
+  }
+
+  // Sample section.
   RETURN_IF_ERROR(SampleLogits(decoded_logits_, output_tokens));
 
   // Read the first output token for the next input token id.

@@ -19,8 +19,10 @@
 #include <optional>
 #include <ostream>
 
+#include "absl/base/nullability.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
+#include "runtime/components/constrained_decoding/constrained_decoder.h"
 
 namespace litert::lm {
 
@@ -273,6 +275,26 @@ class ExecutorPrefillParams {
   std::optional<int> max_prefill_sequence_length_;
 };
 std::ostream& operator<<(std::ostream& os, const ExecutorPrefillParams& params);
+
+// Class to host the parameters for Decode.
+class ExecutorDecodeParams {
+ public:
+  ExecutorDecodeParams() = default;
+
+  // Sets the constraint decoder. The caller retains ownership of the constraint
+  // decoder and must ensure it outlives the ExecutorDecodeParams.
+  void SetConstraintDecoder(ConstrainedDecoder* constraint);
+
+  // Returns true if the constraint decoder is set.
+  bool HasConstraintDecoder() const;
+
+  // Returns the constraint decoder if it exists. Otherwise, returns nullptr.
+  ConstrainedDecoder* GetConstraintDecoder() const;
+
+ private:
+  ConstrainedDecoder* absl_nullable constraint_decoder_ = nullptr;
+};
+std::ostream& operator<<(std::ostream& os, const ExecutorDecodeParams& params);
 
 }  // namespace litert::lm
 

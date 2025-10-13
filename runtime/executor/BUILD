@@ -459,9 +459,11 @@ cc_library(
     srcs = ["llm_executor_io_types.cc"],
     hdrs = ["llm_executor_io_types.h"],
     deps = [
+        "@com_google_absl//absl/base:nullability",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "//runtime/components/constrained_decoding:constrained_decoder",
         "//runtime/util:logging_tensor_buffer",
     ] + select({
         "@litert//litert:litert_link_capi_so": [
@@ -479,13 +481,14 @@ cc_test(
     deps = [
         ":llm_executor_io_types",
         "@com_google_googletest//:gtest_main",
-        "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/types:span",
         "@litert//litert/c:litert_tensor_buffer",
         "@litert//litert/cc:litert_element_type",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_model",
         "@litert//litert/cc:litert_tensor_buffer",
+        "//runtime/components/constrained_decoding:constrained_decoder",
+        "//runtime/components/constrained_decoding:fake_constraint",
     ],
 )
 

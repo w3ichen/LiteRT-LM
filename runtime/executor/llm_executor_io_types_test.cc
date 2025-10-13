@@ -28,6 +28,8 @@
 #include "litert/cc/litert_layout.h"  // from @litert
 #include "litert/cc/litert_model.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
+#include "runtime/components/constrained_decoding/constrained_decoder.h"
+#include "runtime/components/constrained_decoding/fake_constraint.h"
 
 namespace litert::lm {
 namespace {
@@ -748,6 +750,19 @@ TEST(LlmExecutorIoTypesTest, ExecutorPrefillParamsGetSet) {
   auto max_prefill_sequence_length_or = params.GetMaxPrefillSequenceLength();
   ASSERT_TRUE(max_prefill_sequence_length_or.ok());
   EXPECT_EQ(max_prefill_sequence_length_or.value(), 100);
+}
+
+TEST(LlmExecutorIoTypesTest, ExecutorDecodeParamsGetSet) {
+  ExecutorDecodeParams params;
+  EXPECT_FALSE(params.HasConstraintDecoder());
+  EXPECT_EQ(params.GetConstraintDecoder(), nullptr);
+
+  auto constraint = FakeConstraint({1, 2, 3}, /*vocabulary_size=*/10);
+  ConstrainedDecoder constraint_decoder =
+      ConstrainedDecoder(&constraint, /*batch_size=*/1);
+  params.SetConstraintDecoder(&constraint_decoder);
+  EXPECT_TRUE(params.HasConstraintDecoder());
+  EXPECT_EQ(params.GetConstraintDecoder(), &constraint_decoder);
 }
 
 }  // namespace
