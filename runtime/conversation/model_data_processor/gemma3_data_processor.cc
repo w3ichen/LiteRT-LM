@@ -178,7 +178,7 @@ Gemma3DataProcessor::ToInputDataVectorImpl(
     start = prompt_view.data();
     if (IsImage(part)) {
       input_data.emplace_back(
-          InputText(std::string(text_part) + "<start_of_image>"));
+          InputText(std::string(text_part) + "\n\n<start_of_image>\n\n"));
       if (image_files.empty()) {
         return absl::InvalidArgumentError(
             "Provided less images than expected in the prompt.");
@@ -194,7 +194,7 @@ Gemma3DataProcessor::ToInputDataVectorImpl(
       input_data.emplace_back(InputImage(std::move(preprocessed_image)));
     } else if (IsAudio(part)) {
       input_data.emplace_back(
-          InputText(std::string(text_part) + "<start_of_audio>"));
+          InputText(std::string(text_part) + "\n\n<start_of_audio>\n\n"));
       if (audio_files.empty()) {
         return absl::InvalidArgumentError(
             "Provided less audio than expected in the prompt.");

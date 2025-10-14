@@ -178,7 +178,8 @@ TEST(Gemma3DataProcessorTest, ToInputDataVectorTextAndImage) {
                                    json::array({message}), {}));
 
   InputText expected_text1(
-      "<start_of_turn>user\nHere is an image of apples <start_of_image>");
+      "<start_of_turn>user\nHere is an image of apples "
+      "\n\n<start_of_image>\n\n");
   StbImagePreprocessor image_preprocessor;
   ImagePreprocessParameter image_params;
   image_params.SetTargetDimensions(Dimensions({1, 224, 128, 3}));
@@ -329,7 +330,11 @@ TEST(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextAndImage) {
   InputText expected_text1(R"""(<start_of_turn>user
 Hello world!
 
-How are you?<start_of_image>)""");
+How are you?
+
+<start_of_image>
+
+)""");
   StbImagePreprocessor image_preprocessor;
   ImagePreprocessParameter image_params;
   image_params.SetTargetDimensions(Dimensions({1, 768, 768, 3}));
@@ -340,7 +345,11 @@ How are you?<start_of_image>)""");
 <start_of_turn>model
 I am doing well, thanks for asking.<end_of_turn>
 <start_of_turn>user
-<start_of_image>)""");
+
+
+<start_of_image>
+
+)""");
   InputText expected_text3(R"""(What is the capital of France?<end_of_turn>
 <start_of_turn>model
 )""");
@@ -724,7 +733,7 @@ TEST(Gemma3DataProcessorTest, ToInputDataVectorTextAndAudio) {
 
   InputText expected_text1(
       "<start_of_turn>user\nHere is an audio. Please transcribe it: "
-      "<start_of_audio>");
+      "\n\n<start_of_audio>\n\n");
   ASSERT_OK_AND_ASSIGN(auto audio_preprocessor,
                        AudioPreprocessorMiniAudio::Create(
                            AudioPreprocessorConfig::CreateDefaultUsmConfig()));
@@ -772,7 +781,11 @@ TEST(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextAndAudio) {
   InputText expected_text1(R"""(<start_of_turn>user
 Hello world!
 
-How are you?<start_of_audio>)""");
+How are you?
+
+<start_of_audio>
+
+)""");
   ASSERT_OK_AND_ASSIGN(auto audio_preprocessor,
                        AudioPreprocessorMiniAudio::Create(
                            AudioPreprocessorConfig::CreateDefaultUsmConfig()));
@@ -783,7 +796,11 @@ How are you?<start_of_audio>)""");
 <start_of_turn>model
 I am doing well, thanks for asking.<end_of_turn>
 <start_of_turn>user
-<start_of_audio>)""");
+
+
+<start_of_audio>
+
+)""");
   InputText expected_text3(R"""(What is the capital of France?<end_of_turn>
 <start_of_turn>model
 )""");
