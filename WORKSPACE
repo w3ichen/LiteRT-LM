@@ -379,6 +379,7 @@ http_archive(
 load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
 
 android_ndk_repository(name = "androidndk")
+android_sdk_repository(name = "androidsdk")
 
 # Configure Android NDK only when ANDROID_NDK_HOME is set.
 # Creates current_android_ndk_env.bzl as a workaround since shell environment is available only

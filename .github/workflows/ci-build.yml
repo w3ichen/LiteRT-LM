@@ -122,6 +122,7 @@ jobs:
           bazel build --disk_cache=~/.cache/bazel-android --config=android_arm64 \
             //... \
             //runtime/engine:litert_lm_main \
+            //android/java/com/google/ai/edge/litertlm/jni:jni \
             @litert//litert/vendors/mediatek/dispatch:dispatch_api_so \
             @litert//litert/vendors/qualcomm/dispatch:dispatch_api_so \
             -- \
