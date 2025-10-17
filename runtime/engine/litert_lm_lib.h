@@ -35,6 +35,7 @@ struct LiteRtLmSettings {
   std::optional<std::string> expected_output = std::nullopt;
   int max_num_tokens = 0;
   std::set<int> prefill_batch_sizes;
+  int num_output_candidates = 1;
   bool benchmark = false;
   int benchmark_prefill_tokens = 0;
   int benchmark_decode_tokens = 0;

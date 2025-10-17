@@ -55,6 +55,7 @@ std::ostream& operator<<(std::ostream& os, const CpuConfig& config) {
 std::ostream& operator<<(std::ostream& os, const AdvancedSettings& settings) {
   os << "prefill_batch_sizes: ["
      << absl::StrJoin(settings.prefill_batch_sizes, ", ") << "]\n";
+  os << "num_output_candidates: " << settings.num_output_candidates << "\n";
   os << "configure_magic_numbers: " << settings.configure_magic_numbers << "\n";
   os << "verify_magic_numbers: " << settings.verify_magic_numbers << "\n";
   os << "clear_kv_cache_before_prefill: "

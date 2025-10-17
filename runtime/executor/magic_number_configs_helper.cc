@@ -39,6 +39,7 @@ namespace {
 struct MagicNumbers {
   int64_t context_length = 0;
   std::vector<int64_t> prefill_lengths;
+  int64_t num_output_candidates = 0;
 };
 
 constexpr absl::string_view kPrefillSignaturePrefix = "prefill";
@@ -47,13 +48,21 @@ constexpr absl::string_view kTestPrefillSignaturePrefix = "test_prefill";
 constexpr absl::string_view kTestDecodeSignaturePrefix = "test_decode";
 constexpr absl::string_view kMaskSubstr = "mask";
 constexpr absl::string_view kInputPosSubstr = "pos";
+constexpr absl::string_view kOutputLogitsSubstr = "logits";
 constexpr int64_t kDefaultTargetNumberBase = 256;
 
-Expected<int64_t> GetLastDimension(const Subgraph& subgraph,
-                                   absl::string_view input_name) {
+Expected<int64_t> GetLastDimensionOfInput(const Subgraph& subgraph,
+                                          absl::string_view input_name) {
   LITERT_ASSIGN_OR_RETURN(auto tensor, subgraph.Input(input_name));
   LITERT_ASSIGN_OR_RETURN(auto type, tensor.RankedTensorType());
   return type.Layout().Dimensions()[type.Layout().Rank() - 1];
+}
+
+Expected<int64_t> GetFirstDimensionOfOutput(const Subgraph& subgraph,
+                                            absl::string_view output_name) {
+  LITERT_ASSIGN_OR_RETURN(auto tensor, subgraph.Output(output_name));
+  LITERT_ASSIGN_OR_RETURN(auto type, tensor.RankedTensorType());
+  return type.Layout().Dimensions()[0];
 }
 
 // Check if the number is a magic number.
@@ -74,9 +83,11 @@ bool IsMagicNumber(int64_t number) {
 }
 
 Expected<void> SetMagicNumberIfPrime(const Subgraph& subgraph,
-                                     absl::string_view input_name,
+                                     absl::string_view tensor_name, bool input,
                                      int64_t& magic_number) {
-  LITERT_ASSIGN_OR_RETURN(auto dim, GetLastDimension(subgraph, input_name));
+  auto expected_dim = input ? GetLastDimensionOfInput(subgraph, tensor_name)
+                            : GetFirstDimensionOfOutput(subgraph, tensor_name);
+  LITERT_ASSIGN_OR_RETURN(auto dim, expected_dim);
   if (IsMagicNumber(dim)) {
     if (magic_number == 0) {
       magic_number = dim;
@@ -99,12 +110,13 @@ Expected<MagicNumbers> GetMagicNumbersFromModel(const Model& litert_model) {
     if (signature.Key().starts_with(kPrefillSignaturePrefix)) {
       for (const auto& input_name : signature.InputNames()) {
         if (absl::StrContains(input_name, kMaskSubstr)) {
-          LITERT_RETURN_IF_ERROR(SetMagicNumberIfPrime(
-              subgraph, input_name, magic_numbers.context_length));
+          LITERT_RETURN_IF_ERROR(
+              SetMagicNumberIfPrime(subgraph, input_name, /*input=*/true,
+                                    magic_numbers.context_length));
         } else if (absl::StrContains(input_name, kInputPosSubstr)) {
           int64_t prefill_length = 0;
-          LITERT_RETURN_IF_ERROR(
-              SetMagicNumberIfPrime(subgraph, input_name, prefill_length));
+          LITERT_RETURN_IF_ERROR(SetMagicNumberIfPrime(
+              subgraph, input_name, /*input=*/true, prefill_length));
           if (prefill_length > 0) {
             magic_numbers.prefill_lengths.push_back(prefill_length);
           }
@@ -113,8 +125,16 @@ Expected<MagicNumbers> GetMagicNumbersFromModel(const Model& litert_model) {
     } else if (signature.Key().starts_with(kDecodeSignaturePrefix)) {
       for (const auto& input_name : signature.InputNames()) {
         if (absl::StrContains(input_name, kMaskSubstr)) {
-          LITERT_RETURN_IF_ERROR(SetMagicNumberIfPrime(
-              subgraph, input_name, magic_numbers.context_length));
+          LITERT_RETURN_IF_ERROR(
+              SetMagicNumberIfPrime(subgraph, input_name, /*input=*/true,
+                                    magic_numbers.context_length));
+        }
+      }
+      for (const auto& output_name : signature.OutputNames()) {
+        if (absl::StrContains(output_name, kOutputLogitsSubstr)) {
+          LITERT_RETURN_IF_ERROR(
+              SetMagicNumberIfPrime(subgraph, output_name, /*input=*/false,
+                                    magic_numbers.num_output_candidates));
         }
       }
     }
@@ -154,10 +174,11 @@ GetVerificationPairs(const Model& litert_model,
       for (const auto& input_name : signature.InputNames()) {
         if (absl::StrContains(input_name, kMaskSubstr) ||
             absl::StrContains(input_name, kInputPosSubstr)) {
-          LITERT_ASSIGN_OR_RETURN(auto dim,
-                                  GetLastDimension(subgraph, input_name));
-          LITERT_ASSIGN_OR_RETURN(auto test_dim,
-                                  GetLastDimension(test_subgraph, input_name));
+          LITERT_ASSIGN_OR_RETURN(
+              auto dim, GetLastDimensionOfInput(subgraph, input_name));
+          LITERT_ASSIGN_OR_RETURN(
+              auto test_dim,
+              GetLastDimensionOfInput(test_subgraph, input_name));
           // Check if dim is same as test_dim, or as a magic number when
           // test_dim is target number corresponding to the magic number.
           // Otherwise, the shapes are not same.
@@ -176,6 +197,29 @@ GetVerificationPairs(const Model& litert_model,
             }
             is_same_shape = false;
             break;
+          }
+        }
+      }
+      if (is_same_shape &&
+          test_signature.Key().starts_with(kTestDecodeSignaturePrefix)) {
+        for (const auto& output_name : signature.OutputNames()) {
+          if (absl::StrContains(output_name, kOutputLogitsSubstr)) {
+            LITERT_ASSIGN_OR_RETURN(
+                auto dim, GetFirstDimensionOfOutput(subgraph, output_name));
+            LITERT_ASSIGN_OR_RETURN(
+                auto test_dim,
+                GetFirstDimensionOfOutput(test_subgraph, output_name));
+            // Check if dim is same as test_dim, or as a magic number when
+            // test_dim is target number corresponding to the magic number.
+            // Otherwise, the shapes are not same.
+            if (dim != test_dim) {
+              if (dim == magic_numbers.num_output_candidates &&
+                  test_dim == target_numbers.num_output_candidates) {
+                continue;
+              }
+              is_same_shape = false;
+              break;
+            }
           }
         }
       }
@@ -213,7 +257,7 @@ int64_t GetTargetNumber(int64_t magic_number, int64_t target_number_hint) {
   }
   int64_t default_target_number = GetDefaultTargetNumber(magic_number);
   ABSL_LOG(WARNING) << "Target number hint " << target_number_hint
-                    << " is larger than magic number " << magic_number
+                    << " is 0 or larger than magic number " << magic_number
                     << ". Use default target number " << default_target_number;
   return default_target_number;
 }
@@ -224,12 +268,20 @@ std::vector<Environment::Option> MagicNumberConfigsHelper::GetLiteRtEnvOptions(
     const Model& litert_model, const LlmExecutorSettings& executor_settings) {
   auto magic_numbers = GetMagicNumbersFromModel(litert_model);
   if (!magic_numbers || (magic_numbers->context_length == 0 &&
-                         magic_numbers->prefill_lengths.empty())) {
+                         magic_numbers->prefill_lengths.empty() &&
+                         magic_numbers->num_output_candidates == 0)) {
     return {};
   }
 
   // Build magic number configs.
-  int prefill_config_index_base = magic_numbers->context_length > 0 ? 1 : 0;
+  int prefill_config_index_base = 0;
+  if (magic_numbers->context_length > 0) {
+    ++prefill_config_index_base;
+  }
+  if (magic_numbers->num_output_candidates > 0) {
+    ++prefill_config_index_base;
+  }
+
   int num_configs =
       prefill_config_index_base + magic_numbers->prefill_lengths.size();
   magic_number_configs_ = UniqueCPtr<LiteRtMagicNumberConfigs>(
@@ -238,9 +290,9 @@ std::vector<Environment::Option> MagicNumberConfigsHelper::GetLiteRtEnvOptions(
                  num_configs * sizeof(LiteRtMagicNumberConfig))));
   magic_number_configs_->num_configs = num_configs;
 
-  MagicNumbers target_numbers{.context_length = 0};
+  MagicNumbers target_numbers{.context_length = 0, .num_output_candidates = 0};
   // Magic number configs for context length.
-  if (magic_numbers->context_length != 0) {
+  if (magic_numbers->context_length > 0) {
     auto& config = magic_number_configs_->configs[0];
     config.magic_number = magic_numbers->context_length;
     config.target_number = target_numbers.context_length = GetTargetNumber(
@@ -251,6 +303,16 @@ std::vector<Environment::Option> MagicNumberConfigsHelper::GetLiteRtEnvOptions(
   AdvancedSettings advanced_settings;
   if (executor_settings.GetAdvancedSettings()) {
     advanced_settings = *executor_settings.GetAdvancedSettings();
+  }
+
+  if (magic_numbers->num_output_candidates > 0) {
+    int config_index = magic_numbers->context_length > 0 ? 1 : 0;
+    auto& config = magic_number_configs_->configs[config_index];
+    config.magic_number = magic_numbers->num_output_candidates;
+    config.target_number = target_numbers.num_output_candidates =
+        GetTargetNumber(config.magic_number,
+                        advanced_settings.num_output_candidates);
+    config.signature_prefix = kDecodeSignaturePrefix.data();
   }
 
   // How many extra magic numbers are there. If > 0, we can try to match the

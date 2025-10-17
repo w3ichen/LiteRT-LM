@@ -95,6 +95,9 @@ struct AdvancedSettings {
   // the graph has dynamic prefill lengths.
   std::set<int> prefill_batch_sizes;
 
+  // The number of output candidates, or the decode batch size.
+  int num_output_candidates = 1;
+
   // Whether to configure magic numbers when the model contains magic numbers.
   // Magic number for the context length will be replaced with max_num_tokens_
   // in LlmExecutorSettings.
@@ -129,6 +132,7 @@ struct AdvancedSettings {
 
   bool operator==(const AdvancedSettings& other) const {
     return prefill_batch_sizes == other.prefill_batch_sizes &&
+           num_output_candidates == other.num_output_candidates &&
            configure_magic_numbers == other.configure_magic_numbers &&
            verify_magic_numbers == other.verify_magic_numbers &&
            clear_kv_cache_before_prefill ==

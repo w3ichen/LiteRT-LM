@@ -343,6 +343,7 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
     executor_settings.SetBackendConfig(gpu_settings);
   }
   auto session_config = litert::lm::SessionConfig::CreateDefault();
+  session_config.SetNumOutputCandidates(settings.num_output_candidates);
   auto sampler_backend_str = settings.sampler_backend;
   if (!sampler_backend_str.empty()) {
     auto sampler_backend =
@@ -360,6 +361,7 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
 
   AdvancedSettings advanced_settings{
       .prefill_batch_sizes = settings.prefill_batch_sizes,
+      .num_output_candidates = session_config.GetNumOutputCandidates(),
       .configure_magic_numbers = settings.configure_magic_numbers,
       .verify_magic_numbers = settings.verify_magic_numbers,
       .clear_kv_cache_before_prefill = settings.clear_kv_cache_before_prefill,

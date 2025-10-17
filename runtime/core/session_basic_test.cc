@@ -57,6 +57,8 @@
 namespace litert::lm {
 namespace {
 
+using ::testing::status::StatusIs;
+
 constexpr absl::string_view kTestdataDir =
     "litert_lm/runtime/components/testdata/";
 constexpr absl::string_view kTestAudioModelPath =
@@ -89,8 +91,9 @@ absl::StatusOr<std::unique_ptr<FakeLlmExecutor>> CreateFakeLlmExecutor(
     std::vector<std::vector<int>> prefill_tokens,
     std::vector<std::vector<int>> decode_tokens,
     std::optional<std::vector<float>> audio_embedding = std::nullopt) {
+  auto batch_size = decode_tokens.empty() ? 1 : decode_tokens[0].size();
   auto fake_executor = std::make_unique<FakeLlmExecutor>(
-      2560, prefill_tokens, decode_tokens, /*batch_size=*/1, audio_embedding);
+      2560, prefill_tokens, decode_tokens, batch_size, audio_embedding);
   return std::move(fake_executor);
 }
 
@@ -300,6 +303,47 @@ TEST_F(SessionBasicTest, RunDecode) {
   // The response is " How's it going?" since "!" is the stop token which is
   // not included in the response.
   EXPECT_EQ(*(responses->GetResponseTextAt(0)), " How's it going?");
+  EXPECT_THAT(responses->GetResponseTextAt(1),
+              StatusIs(absl::StatusCode::kInvalidArgument));
+}
+
+TEST_F(SessionBasicTest, RunDecodeWithMultipleOutputCandidates) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params_;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetNumOutputCandidates(3);
+  session_config.SetSamplerBackend(Backend::CPU);
+  ASSERT_OK_AND_ASSIGN(
+      auto executor,
+      CreateFakeLlmExecutor(
+          // "Hello World!"
+          /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
+          // "How's it going?", "Hello World", "How's it going?"
+          /*decode_tokens=*/{
+             {224, 90, 224},  {24, 547, 24},   {8, 58, 8},
+             {66, 735, 66},   {246, 210, 246}, {18, 466, 18},
+             {2295, 2294, 2295}, {2294, 0, 2294}}));
+  auto session = SessionBasic::Create(
+      executor.get(), tokenizer_.get(),
+      /*image_preprocessor=*/nullptr,
+      /*vision_executor=*/nullptr, /*audio_preprocessor=*/nullptr,
+      /*audio_executor=*/nullptr, session_config, std::nullopt,
+      worker_thread_pool_.get());
+  std::vector<InputData> inputs;
+  inputs.emplace_back(InputText("Hello World!"));
+  EXPECT_OK((*session)->RunPrefill(inputs));
+  auto responses = (*session)->RunDecode();
+  EXPECT_OK(responses);
+  EXPECT_EQ(responses->GetNumOutputCandidates(), 3);
+  // The response is " How's it going?" since "!" is the stop token which is
+  // not included in the response.
+  EXPECT_EQ(*(responses->GetResponseTextAt(0)), " How's it going?");
+  EXPECT_EQ(*(responses->GetResponseTextAt(1)), " Hello World");
+  EXPECT_EQ(*(responses->GetResponseTextAt(2)), " How's it going?");
+  EXPECT_THAT(responses->GetResponseTextAt(3),
+              StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 TEST_F(SessionBasicTest, RunDecodeWithSamplerAndConstrainedDecoding) {

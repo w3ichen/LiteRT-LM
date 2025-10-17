@@ -214,6 +214,7 @@ TEST(LlmExecutorConfigTest, LlmExecutorSettingsWithAdvancedSettings) {
   (*settings).SetCacheDir("/path/to/cache");
   (*settings).SetAdvancedSettings(AdvancedSettings{
       .prefill_batch_sizes = {128, 256},
+      .num_output_candidates = 3,
       .configure_magic_numbers = true,
       .verify_magic_numbers = true,
       .clear_kv_cache_before_prefill = true,
@@ -241,6 +242,7 @@ model_assets: model_path: /path/to/model1
 fake_weights_mode: FAKE_WEIGHTS_NONE
 
 advanced_settings: prefill_batch_sizes: [128, 256]
+num_output_candidates: 3
 configure_magic_numbers: 1
 verify_magic_numbers: 1
 clear_kv_cache_before_prefill: 1

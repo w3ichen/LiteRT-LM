@@ -548,10 +548,10 @@ absl::StatusOr<int> Prefill(LlmExecutor& executor, ExecutorInputs& inputs,
 
 absl::StatusOr<Responses> Decode(LlmExecutor& executor, Tokenizer& tokenizer,
                                  const StopTokenDetector& stop_token_detector,
+                                 int num_output_candidates,
                                  Constraint* constraint,
                                  std::optional<BenchmarkInfo>& benchmark_info,
                                  std::atomic<bool>* cancelled) {
-  const int num_output_candidates = 1;
   return DecodeLoop(
       executor, tokenizer, stop_token_detector, num_output_candidates,
       benchmark_info, /*sampler=*/std::nullopt, constraint,
@@ -560,7 +560,7 @@ absl::StatusOr<Responses> Decode(LlmExecutor& executor, Tokenizer& tokenizer,
 
 absl::Status DecodeStreaming(LlmExecutor& executor, Tokenizer& tokenizer,
                              const StopTokenDetector& stop_token_detector,
-                             Constraint* constraint,
+                             int num_output_candidates, Constraint* constraint,
                              std::optional<BenchmarkInfo>& benchmark_info,
                              std::unique_ptr<InferenceCallbacks> callbacks,
                              std::atomic<bool>* cancelled) {
@@ -568,7 +568,6 @@ absl::Status DecodeStreaming(LlmExecutor& executor, Tokenizer& tokenizer,
     return absl::InvalidArgumentError(
         "Callbacks must not be null for streaming.");
   }
-  const int num_output_candidates = 1;
   return DecodeLoop(executor, tokenizer, stop_token_detector,
                     num_output_candidates, benchmark_info,
                     /*sampler=*/std::nullopt, constraint,

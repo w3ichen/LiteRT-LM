@@ -71,6 +71,9 @@ ABSL_FLAG(std::vector<std::string>, prefill_batch_sizes, {},
           "empty, it will be the list of one entry with the length of input "
           "prompt tokens or benchmark_prefill_tokens when benchmark mode is "
           "enabled.");
+ABSL_FLAG(int, num_output_candidates, 1,
+          "The number of candidates generated for the given prompt, or the "
+          "batch size of the decode signature.");
 ABSL_FLAG(bool, benchmark, false, "Benchmark the LLM execution.");
 ABSL_FLAG(int, benchmark_prefill_tokens, 0,
           "If benchmark is true and the value is larger than 0, the benchmark "
@@ -201,6 +204,7 @@ absl::Status MainHelper(int argc, char** argv) {
   ASSIGN_OR_RETURN(
       settings.prefill_batch_sizes,
       ParsePrefillBatchSizes(absl::GetFlag(FLAGS_prefill_batch_sizes)));
+  settings.num_output_candidates = absl::GetFlag(FLAGS_num_output_candidates);
   settings.benchmark = absl::GetFlag(FLAGS_benchmark);
   settings.benchmark_prefill_tokens =
       absl::GetFlag(FLAGS_benchmark_prefill_tokens);
