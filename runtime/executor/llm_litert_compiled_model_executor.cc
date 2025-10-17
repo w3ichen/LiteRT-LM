@@ -549,47 +549,47 @@ absl::Status LlmLiteRtCompiledModelExecutor::ConsumePendingOrAddProcessedToken(
 absl::Status LlmLiteRtCompiledModelExecutor::DecodeInternal(
     const int step, const std::shared_ptr<TokenData> token,
     TensorBuffer& output_logits) {
-  {
-    const bool use_token_as_lookup = !signatures_.input_tokens.empty();
-    const bool use_per_layer_embedding =
-        signatures_.input_per_layer_embeddings.has_value();
+  const bool use_token_as_lookup = !signatures_.input_tokens.empty();
+  const bool use_per_layer_embedding =
+      signatures_.input_per_layer_embeddings.has_value();
 
-    // Fill the input buffers with scoped locks.
-    if (use_token_as_lookup) {
-      RETURN_IF_ERROR(FillInputBufferWithToken(
-          token, decode_input_buffers_[signatures_.input_tokens]));
-    } else {
-      if (!signatures_.input_embeddings.has_value()) {
-        return absl::InvalidArgumentError(
-            "Input tokens or embeddings must be provided.");
-      }
-      RETURN_IF_ERROR(FillInputBufferWithToken(
-          token, decode_input_buffers_[signatures_.input_embeddings.value()]));
-      if (use_per_layer_embedding) {
-        RETURN_IF_ERROR(FillInputBufferWithToken(
-            token,
-            decode_input_buffers_[signatures_.input_per_layer_embeddings
-                                      .value()],
-            /*is_per_layer_embedding=*/true));
-      }
+  // Fill the input buffers with scoped locks.
+  if (use_token_as_lookup) {
+    RETURN_IF_ERROR(FillInputBufferWithToken(
+        token, decode_input_buffers_[signatures_.input_tokens]));
+  } else {
+    if (!signatures_.input_embeddings.has_value()) {
+      return absl::InvalidArgumentError(
+          "Input tokens or embeddings must be provided.");
     }
-    auto& decode_input_pos_buffer =
-        decode_input_buffers_[signatures_.input_positions];
+    RETURN_IF_ERROR(FillInputBufferWithToken(
+        token, decode_input_buffers_[signatures_.input_embeddings.value()]));
+    if (use_per_layer_embedding) {
+      RETURN_IF_ERROR(FillInputBufferWithToken(
+          token,
+          decode_input_buffers_[signatures_.input_per_layer_embeddings.value()],
+          /*is_per_layer_embedding=*/true));
+    }
+  }
+
+  {
     LITERT_ASSIGN_OR_RETURN(
         auto decode_input_pos_lock_and_addr,
-        TensorBufferScopedLock::Create(decode_input_pos_buffer,
-                                       TensorBuffer::LockMode::kWrite));
+        TensorBufferScopedLock::Create(
+            decode_input_buffers_[signatures_.input_positions],
+            TensorBuffer::LockMode::kWrite));
     auto* decode_input_pos_ptr =
         static_cast<int32_t*>(decode_input_pos_lock_and_addr.second);
-    if (signatures_.input_attn_mask.has_value()) {
-      RETURN_IF_ERROR(InitializeAttentionMask(
-          decode_input_buffers_[signatures_.input_attn_mask.value()],
-          IsCalculationPrecisionF16()));
-      RETURN_IF_ERROR(FillAttentionMask(
-          decode_input_buffers_[signatures_.input_attn_mask.value()], step,
-          /*steps=*/1));
-    }
     decode_input_pos_ptr[0] = step;
+  }
+
+  if (signatures_.input_attn_mask.has_value()) {
+    RETURN_IF_ERROR(InitializeAttentionMask(
+        decode_input_buffers_[signatures_.input_attn_mask.value()],
+        IsCalculationPrecisionF16()));
+    RETURN_IF_ERROR(FillAttentionMask(
+        decode_input_buffers_[signatures_.input_attn_mask.value()], step,
+        /*steps=*/1));
   }
 
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
@@ -633,13 +633,13 @@ absl::Status LlmLiteRtCompiledModelExecutor::Decode(
     ::litert::TensorBuffer& output_tokens,
     const ExecutorDecodeParams& decode_params) {
 
-  ASSIGN_OR_RETURN(decoded_logits_,
+  ASSIGN_OR_RETURN(auto decoded_logits,
                    DecodeLogits(ExecutorInputs(), decode_params));
-  LITERT_ASSIGN_OR_RETURN(auto size, decoded_logits_.PackedSize());
+  LITERT_ASSIGN_OR_RETURN(auto size, decoded_logits.PackedSize());
   if (decoded_logits_vector_.empty()) {
     decoded_logits_vector_ = std::vector<float>(size / sizeof(float));
   }
-  RETURN_IF_ERROR(SampleLogits(decoded_logits_, output_tokens));
+  RETURN_IF_ERROR(SampleLogits(decoded_logits, output_tokens));
 
   // Read the first output token for the next input token id.
   bool reset_output_token = false;
