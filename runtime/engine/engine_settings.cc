@@ -460,12 +460,14 @@ std::ostream& operator<<(std::ostream& os, const SessionConfig& config) {
   }
   os << "  NumOutputCandidates: " << config.GetNumOutputCandidates()
      << std::endl;
-  os << "  PromptTemplates: " << config.GetPromptTemplates().DebugString()
-     << std::endl;
   os << "  LlmModelType: " << config.GetLlmModelType().DebugString()
      << std::endl;
   os << "  JinjaPromptTemplate: " << config.GetJinjaPromptTemplate()
      << std::endl;
+  os << "  PromptTemplates: " << config.GetPromptTemplates().DebugString()
+     << std::endl;
+  os << "  ApplyPromptTemplatesInSession: "
+     << config.GetApplyPromptTemplateInSession() << std::endl;
   return os;
 }
 

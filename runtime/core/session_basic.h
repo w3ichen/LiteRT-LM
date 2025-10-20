@@ -18,6 +18,7 @@
 #include <atomic>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -122,7 +123,7 @@ class SessionBasic : public Engine::Session {
   // is_first_chunk: Whether the input is the first chunk of the turn.
   // is_last_chunk: Whether the input is the last chunk of the turn.
   // The output is the text input after applying the proper prompt templates.
-  // TODO - b/436674053: This is a temporary solution to add required templates
+  // TODO - b/453312248: This is a temporary solution to add required templates
   // to the input. Should be removed once the prompt templates are properly
   // handled via the conversation layer.
   absl::StatusOr<std::vector<InputData>> ApplyPromptTemplates(
@@ -217,6 +218,10 @@ class SessionBasic : public Engine::Session {
 
   // The util function to convert the string to processed input text.
   absl::StatusOr<InputText> StringToProcessedInputText(absl::string_view text);
+
+  // The util function to get the BOS string if there is a valid BOS token id.
+  // Otherwise, return an empty string.
+  absl::StatusOr<std::string> MaybeGetBosString();
 
   // The executor used for run the LLM for prefill/decode.
   LlmExecutor& executor_;

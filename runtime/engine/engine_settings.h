@@ -194,6 +194,16 @@ class SessionConfig {
   const std::string& GetJinjaPromptTemplate() const;
   std::string& GetMutableJinjaPromptTemplate();
 
+  // Whether to apply the deprecated prompt templates in the session.
+  // TODO - b/453312248: Remove this field once the prompt templates are
+  // removed.
+  bool GetApplyPromptTemplateInSession() const {
+    return apply_prompt_template_in_session_;
+  }
+  void SetApplyPromptTemplateInSession(bool apply_prompt_template_in_session) {
+    apply_prompt_template_in_session_ = apply_prompt_template_in_session;
+  }
+
  private:
   // Private constructor for the SessionConfig. The user should use the
   // CreateDefault() method to create a SessionConfig.
@@ -228,6 +238,11 @@ class SessionConfig {
 
   // Backend to use for sampling.
   Backend sampler_backend_ = Backend::UNSPECIFIED;
+
+  // Whether to apply the deprecated prompt templates in the session.
+  // TODO - b/453312248: Remove this field once the prompt templates are
+  // removed.
+  bool apply_prompt_template_in_session_ = true;
 };
 
 std::ostream& operator<<(std::ostream& os, const SessionConfig& config);

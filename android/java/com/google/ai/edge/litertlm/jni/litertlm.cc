@@ -714,13 +714,6 @@ JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateConversation)(
         CreateSamplerParamsFromJni(env, sampler_config_obj);
   }
 
-  // Set an empty user's prefix field to avoid prompt template being
-  // overridden by the llm metadata.
-  auto emptyTemplate = litert::lm::proto::PromptTemplates();
-  auto affixes = emptyTemplate.mutable_user();
-  affixes->set_prefix("");
-  session_config.GetMutablePromptTemplates() = emptyTemplate;
-
   // Create the Preface from the system instruction and tools.
   JsonPreface json_preface;
 

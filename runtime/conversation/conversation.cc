@@ -68,10 +68,10 @@ absl::StatusOr<ConversationConfig> ConversationConfig::CreateFromSessionConfig(
     return absl::InvalidArgumentError("Only JsonPreface is supported for now.");
   }
   SessionConfig session_config_copy = session_config;
-  // Clear the prompt templates to prevent Session applying the prompt
-  // templates twice.
-  session_config_copy.GetMutablePromptTemplates().mutable_user()->set_prefix(
-      "");
+  // Disable the deprecated prompt templates in the session.
+  // TODO - b/453312248: Remove this once the prompt template is removed from
+  // Session
+  session_config_copy.SetApplyPromptTemplateInSession(false);
   RETURN_IF_ERROR(
       session_config_copy.MaybeUpdateAndValidate(engine.GetEngineSettings()));
   if (session_config_copy.GetJinjaPromptTemplate().empty()) {

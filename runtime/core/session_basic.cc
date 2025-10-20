@@ -203,17 +203,35 @@ absl::StatusOr<ExecutorAudioData> SessionBasic::CombineExecutorData(
   return CombineExecutorDataImpl(executor_data);
 }
 
-absl::StatusOr<std::vector<InputData>> SessionBasic::ApplyPromptTemplates(
-    const std::vector<InputData>& contents) {
+absl::StatusOr<std::string> SessionBasic::MaybeGetBosString() {
   auto bos_token_id = session_config_.GetStartTokenId();
   std::string bos_string = "";
-  // Lookup the BOS string from the tokenizer.
-  // If the BOS token id is not valid, the bos string will remain empty.
   if (bos_token_id >= 0) {
     ASSIGN_OR_RETURN(bos_string, tokenizer_.TokenIdsToText({bos_token_id}));
   }
+  return bos_string;
+}
 
+absl::StatusOr<std::vector<InputData>> SessionBasic::ApplyPromptTemplates(
+    const std::vector<InputData>& contents) {
+  if (contents.empty()) {
+    return std::vector<InputData>();
+  }
+  ASSIGN_OR_RETURN(std::string bos_string, MaybeGetBosString());
   std::vector<InputData> templated_contents;
+  if (!session_config_.GetApplyPromptTemplateInSession()) {
+    if (is_first_turn_ && !bos_string.empty()) {
+      templated_contents.push_back(InputText(bos_string));
+    }
+    is_first_turn_ = false;
+    for (int i = 0; i < contents.size(); ++i) {
+      const auto& content = contents[i];
+      ASSIGN_OR_RETURN(auto content_copy, CreateInputDataCopy(content));
+      templated_contents.emplace_back(std::move(content_copy));
+    }
+    return templated_contents;
+  }
+
   for (int i = 0; i < contents.size(); ++i) {
     const auto& content = contents[i];
     const bool is_first_chunk = i == 0;
@@ -239,7 +257,7 @@ absl::StatusOr<std::vector<InputData>> SessionBasic::ApplyPromptTemplates(
     std::string session_prefix = "";
     if (is_first_chunk) {
       session_prefix = is_first_turn_ ? bos_string : "\n";
-      if (is_first_turn_) is_first_turn_ = false;
+      is_first_turn_ = false;
     }
     std::string turn_prefix = absl::StrCat(
         session_prefix, session_config_.GetPromptTemplates().user().prefix());
