@@ -321,8 +321,14 @@ absl::StatusOr<ExecutorInputs> SessionBasic::ProcessAndCombineContents(
         return absl::InvalidArgumentError(
             "Image tensor is null in preprocessed_contents.");
       }
+      if (benchmark_info_.has_value()) {
+        RETURN_IF_ERROR(benchmark_info_->TimeMarkDelta("vision_executor"));
+      }
       ASSIGN_OR_RETURN(auto single_image_data,
                        vision_executor_->Encode(*image_tensor));
+      if (benchmark_info_.has_value()) {
+        RETURN_IF_ERROR(benchmark_info_->TimeMarkDelta("vision_executor"));
+      }
       ASSIGN_OR_RETURN(auto embeddings_ptr,
                        single_image_data.GetEmbeddingsPtr());
       const auto& dimensions = TensorBufferDims(*embeddings_ptr);
@@ -335,8 +341,14 @@ absl::StatusOr<ExecutorInputs> SessionBasic::ProcessAndCombineContents(
                    std::get_if<InputAudio>(&preprocessed_content)) {
       ASSIGN_OR_RETURN(const auto* spectrogram_tensor,
                        input_audio->GetPreprocessedAudioTensor());
+      if (benchmark_info_.has_value()) {
+        RETURN_IF_ERROR(benchmark_info_->TimeMarkDelta("audio_executor"));
+      }
       ASSIGN_OR_RETURN(auto single_audio_data,
                        audio_executor_->Encode(*spectrogram_tensor));
+      if (benchmark_info_.has_value()) {
+        RETURN_IF_ERROR(benchmark_info_->TimeMarkDelta("audio_executor"));
+      }
       const int num_audio_tokens = single_audio_data.GetValidTokens();
       all_audio_data.push_back(std::move(single_audio_data));
       combined_token_ids.insert(combined_token_ids.end(), num_audio_tokens,
@@ -456,9 +468,6 @@ absl::Status SessionBasic::RunPrefill(const std::vector<InputData>& contents) {
     // Reset the cancelled flag before processing the next turn.
     cancelled_ = false;
   }
-  if (benchmark_info_.has_value()) {
-    RETURN_IF_ERROR(benchmark_info_->TimePrefillTurnStart());
-  }
   std::vector<InputData> preprocessed_contents;
   if (benchmark_info_.has_value() &&
       benchmark_info_->GetBenchmarkParams().num_prefill_tokens() > 0) {
@@ -489,9 +498,6 @@ absl::Status SessionBasic::RunPrefillAsync(
   if (cancelled_.load()) {
     // Reset the cancelled flag before processing the next turn.
     cancelled_ = false;
-  }
-  if (benchmark_info_.has_value()) {
-    RETURN_IF_ERROR(benchmark_info_->TimePrefillTurnStart());
   }
   std::vector<InputData> preprocessed_contents;
   if (benchmark_info_.has_value() &&

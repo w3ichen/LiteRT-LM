@@ -539,6 +539,9 @@ absl::StatusOr<int> Prefill(LlmExecutor& executor, ExecutorInputs& inputs,
   ExecutorPrefillParams params;
   // Wait for prefill to complete if benchmark mode is enabled.
   params.SetWaitForCompletion(wait_for_completion | benchmark_info.has_value());
+  if (benchmark_info.has_value()) {
+    RETURN_IF_ERROR(benchmark_info->TimePrefillTurnStart());
+  }
   RETURN_IF_ERROR(executor.Prefill(inputs, params));
   if (benchmark_info.has_value()) {
     RETURN_IF_ERROR(benchmark_info->TimePrefillTurnEnd(ids_buffer_span.size()));
