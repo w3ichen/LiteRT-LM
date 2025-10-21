@@ -97,11 +97,15 @@ void InternalCallbacksAdapter::OnDone() {
     user_callbacks_->OnError(complete_message.status());
     return;
   }
-  user_callbacks_->OnComplete();
   if (complete_message_callback_) {
     complete_message_callback_(*complete_message);
   }
   complete_message_callback_ = nullptr;
+
+  // user_callbacks_->OnComplete() must happen after complete_message_callback_.
+  // Otherwise, the current complete_message might be added after the next user
+  // message. As a result, wrong history order. (b/451688051)
+  user_callbacks_->OnComplete();
 }
 
 void InternalCallbacksAdapter::OnError(const absl::Status& status) {
