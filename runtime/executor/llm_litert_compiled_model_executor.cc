@@ -346,13 +346,9 @@ absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
           IsCalculationPrecisionF16()));
     }
     // TODO(b/425396146): Add the unit tests for checking the prefill length.
-    int prefill_length = ids.size();
-    if (prefill_length > 1) {
-      // If the prefill length is larger than 1, we will not use the last token
-      // of the current input. Last token will be used as input in the next
-      // prefill.
-      prefill_length = ids.size() - 1;
-    }
+    // We always hold one pending token in the input ids for the next
+    // prefill or decode step.
+    int prefill_length = ids.size() - 1;
 
     // Check if have a pending input token. Note that 'internal_start_step' is
     // always equal to the number of processed tokens plus 1.
@@ -363,6 +359,13 @@ absl::Status LlmLiteRtCompiledModelExecutor::PrefillInternal(
     const bool use_token_as_lookup = !signatures_.input_tokens.empty();
     const bool use_per_layer_embedding =
         signatures_.input_per_layer_embeddings.has_value();
+    // If there is no pending input token and no input token to prefill, we can
+    // return early by storing the token as a pending input token.
+    if (!has_pending_input_token && prefill_length == 0) {
+      RETURN_IF_ERROR(processed_tokens_.AddPendingInputToken(
+          std::make_shared<TokenData>(ids[0])));
+      return absl::OkStatus();
+    }
     int input_idx = 0;
     if (has_pending_input_token) {
       if (use_token_as_lookup) {

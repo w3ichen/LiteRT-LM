@@ -412,14 +412,10 @@ absl::StatusOr<Responses> DecodeLoop(
 
     if (ShouldStop(*all_done, benchmark_decode_token_count, num_decode_steps,
                    executor.GetCurrentStep().value(), max_num_tokens)) {
-      // TODO b/453705234 - Revisit the logic here to see if we can make the
-      // internal and external sampling paths more consistent.
       if (is_custom_sampling) {
         // For external sampling, the sampled tokens are provided by the
-        // sampler. We must run one prefill to update the kv cache state in the
-        // LLM Executor when stop condition is met, for the last sampled tokens.
-        // Because there is no pending tokens maintained in the LLM Executor for
-        // external sampling path.
+        // sampler. We must run one prefill to add the stop token as pending
+        // token in the LLM Executor when stop condition is met.
         LITERT_ASSIGN_OR_RETURN_ABSL(auto duplicated_decoded_ids,
                                      decoded_ids.value()->Duplicate());
         ExecutorInputs inputs;
