@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <filesystem>  // NOLINT: Required for path manipulation.
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -112,6 +113,16 @@ TEST_F(LoraManagerTest, UseLoRASuccess) {
 
 TEST_F(LoraManagerTest, UseLoRAUnknownIdFails) {
   EXPECT_THAT(lora_manager_->UseLoRA(1), StatusIs(absl::StatusCode::kNotFound));
+}
+
+TEST_F(LoraManagerTest, GetCurrentLoRAIdSuccess) {
+  ASSERT_OK_AND_ASSIGN(ModelAssets model_assets,
+                       ModelAssets::Create(GetLoraOnesFilePath()));
+  EXPECT_EQ(lora_manager_->GetCurrentLoRAId(), std::nullopt);
+  ASSERT_OK(lora_manager_->LoadLoRA(0, model_assets));
+  EXPECT_EQ(lora_manager_->GetCurrentLoRAId(), std::nullopt);
+  EXPECT_OK(lora_manager_->UseLoRA(0));
+  EXPECT_EQ(lora_manager_->GetCurrentLoRAId(), 0);
 }
 
 TEST_F(LoraManagerTest, GetLoRABuffersFailsBeforeUse) {

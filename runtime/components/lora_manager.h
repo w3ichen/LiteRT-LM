@@ -50,6 +50,9 @@ class LoraManager {
   static absl::StatusOr<std::unique_ptr<LoraManager>> Create(
       const litert::Model& model, const litert::CompiledModel& compiled_model);
 
+  // Returns the current LoRA ID.
+  std::optional<uint32_t> GetCurrentLoRAId() const { return current_lora_id_; }
+
   // Loads the LoRA model into tensor loader, but does not use it.
   // To use the lora weights, call `UseLoRA()` with the lora_id.
   // Args:
