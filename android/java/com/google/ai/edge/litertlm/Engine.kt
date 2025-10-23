@@ -106,12 +106,14 @@ class Engine(val engineConfig: EngineConfig) : AutoCloseable {
 
       val toolManager = ToolManager(conversationConfig.tools)
 
+      @OptIn(ExperimentalApi::class) // opt-in experimental flags
       return Conversation(
         LiteRtLmJni.nativeCreateConversation(
           handle!!, // Using !! is okay. Checked initialization already.
           conversationConfig.samplerConfig,
           conversationConfig.systemMessage?.toJson()?.toString() ?: "",
           toolManager.getToolsDescription().toString(),
+          ExperimentalFlags.forceDisableConversationConstrainedDecoding,
         ),
         toolManager,
       )

@@ -16,7 +16,7 @@
 package com.google.ai.edge.litertlm;
 
 /** A wrapper for the native JNI methods. */
-public final class LiteRtLmJni {
+final class LiteRtLmJni {
 
   static {
     System.loadLibrary("litertlm_jni");
@@ -171,7 +171,8 @@ public final class LiteRtLmJni {
       long enginePointer,
       SamplerConfig samplerConfig,
       String systemMessageJsonString,
-      String toolsDescriptionJsonString);
+      String toolsDescriptionJsonString,
+      boolean forceDisableConversationConstraintDecoding);
 
   /**
    * Deletes the LiteRT-LM conversation.

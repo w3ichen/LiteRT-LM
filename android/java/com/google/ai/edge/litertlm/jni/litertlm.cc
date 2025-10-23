@@ -541,7 +541,8 @@ JNIEXPORT jobject JNICALL JNI_METHOD(nativeConversationGetBenchmarkInfo)(
 
 JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateConversation)(
     JNIEnv* env, jclass thiz, jlong engine_pointer, jobject sampler_config_obj,
-    jstring system_message_json_string, jstring tools_description_json_string) {
+    jstring system_message_json_string, jstring tools_description_json_string,
+    jboolean disable_constraint_decoding) {
   Engine* engine = reinterpret_cast<Engine*>(engine_pointer);
 
   // Create a native SessionConfig
@@ -589,7 +590,10 @@ JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateConversation)(
 
   // Create the conversation
   auto conversation_config = ConversationConfig::CreateFromSessionConfig(
-      *engine, session_config, preface);
+      *engine, session_config, preface,
+      std::nullopt
+  );
+
   if (!conversation_config.ok()) {
     ThrowLiteRtLmJniException(env, "Failed to create conversation config: " +
                                        conversation_config.status().ToString());
