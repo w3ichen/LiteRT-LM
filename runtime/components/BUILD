@@ -342,7 +342,6 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
-            "@litert//litert/c:litert_common",
             "@litert//litert/cc:litert_tensor_buffer",
         ],
     }) + select({
@@ -371,7 +370,6 @@ cc_test(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings:string_view",
         "@com_google_absl//absl/types:span",
-        "@litert//litert/c:litert_common",
         "@litert//litert/cc:litert_compiled_model",
         "@litert//litert/cc:litert_environment",
         "@litert//litert/cc:litert_expected",
@@ -556,7 +554,6 @@ cc_test(
         ":lora",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
-        "@litert//litert/c:litert_common",
         "@litert//litert/cc:litert_compiled_model",
         "@litert//litert/cc:litert_environment",
         "@litert//litert/cc:litert_model",
@@ -596,7 +593,6 @@ cc_test(
         ":lora_manager",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
-        "@litert//litert/c:litert_common",
         "@litert//litert/cc:litert_compiled_model",
         "@litert//litert/cc:litert_environment",
         "@litert//litert/cc:litert_model",

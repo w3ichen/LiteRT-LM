@@ -147,7 +147,6 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:string_view",
-        "@litert//litert/c:litert_tensor_buffer_types",
         "@litert//litert/cc:litert_element_type",
         "@litert//litert/cc:litert_environment",
         "@litert//litert/cc:litert_layout",
@@ -185,7 +184,6 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
-            "@litert//litert/c:litert_common",
             "@litert//litert/cc:litert_element_type",
             "@litert//litert/cc:litert_expected",
             "@litert//litert/cc:litert_macros",
@@ -204,7 +202,6 @@ cc_test(
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings:string_view",
         "@com_google_absl//absl/types:span",
-        "@litert//litert/c:litert_common",
         "@litert//litert/cc:litert_model",
         "@litert//litert/cc:litert_tensor_buffer",
         "@litert//litert/test:matchers",
@@ -254,9 +251,6 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
-            "@litert//litert/c:litert_common",
-            "@litert//litert/c:litert_environment_options",
-            "@litert//litert/c:litert_tensor_buffer_types",
             "@litert//litert/c/internal:litert_external_litert_buffer_context",  # buildcleaner: keep
             "@litert//litert/cc:litert_compiled_model",
             "@litert//litert/cc:litert_element_type",
@@ -413,8 +407,6 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
-            "@litert//litert/c:litert_common",
-            "@litert//litert/c:litert_model",
             "@litert//litert/c/options:litert_qualcomm_options",
             "@litert//litert/cc:litert_compiled_model",
             "@litert//litert/cc:litert_element_type",
@@ -500,7 +492,6 @@ cc_test(
         ":llm_executor_io_types",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/types:span",
-        "@litert//litert/c:litert_tensor_buffer",
         "@litert//litert/cc:litert_element_type",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_model",
@@ -558,8 +549,6 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
-            "@litert//litert/c:litert_common",
-            "@litert//litert/c:litert_tensor_buffer_types",
             "@litert//litert/c/options:litert_qualcomm_options",
             "@litert//litert/cc:litert_compiled_model",
             "@litert//litert/cc:litert_environment",
@@ -647,8 +636,6 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
-            "@litert//litert/c:litert_common",
-            "@litert//litert/c:litert_tensor_buffer_types",
             "@litert//litert/cc:litert_compiled_model",
             "@litert//litert/cc:litert_element_type",
             "@litert//litert/cc:litert_environment",
@@ -677,7 +664,6 @@ cc_test(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings:string_view",
         "@com_google_absl//absl/types:span",
-        "@litert//litert/c:litert_tensor_buffer_types",
         "@litert//litert/cc:litert_element_type",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_macros",

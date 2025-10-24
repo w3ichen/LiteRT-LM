@@ -19,7 +19,6 @@
 #include <optional>
 
 #include "absl/status/statusor.h"  // from @com_google_absl
-#include "litert/c/litert_common.h"  // from @litert
 #include "runtime/components/sampler.h"
 #include "runtime/executor/executor_settings_base.h"
 #include "runtime/proto/sampler_params.pb.h"

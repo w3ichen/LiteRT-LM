@@ -56,7 +56,6 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
-            "@litert//litert/c:litert_common",
             "@litert//litert/cc:litert_compiled_model",
             "@litert//litert/cc:litert_element_type",
             "@litert//litert/cc:litert_environment",
@@ -119,7 +118,6 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
-            "@litert//litert/c:litert_common",
             "@litert//litert/cc:litert_compiled_model",
             "@litert//litert/cc:litert_element_type",
             "@litert//litert/cc:litert_environment",
