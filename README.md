@@ -114,8 +114,7 @@ Security** to approve the binary.
 
 ### Mobile Apps
 
--   [Android AI Edge Gallery App]
-(https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery&hl=en_US&pli=1)
+-   [Android AI Edge Gallery App](https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery&hl=en_US&pli=1)
 -   iOS (Coming soon)
 
 Note that the LiteRT-LM runtime is designed to work
