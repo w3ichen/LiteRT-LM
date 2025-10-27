@@ -149,10 +149,6 @@ absl::StatusOr<SortedPrefillSignatureMap> GetPrefillRunnerSetFromModel(
   for (auto& signature : *signatures) {
     if (auto signature_key = signature.Key();
         absl::StartsWith(signature_key, signature_name_base)) {
-      auto subgraph = model.Subgraph(signature_key);
-      if (!subgraph) {
-        return absl::InternalError(subgraph.Error().Message());
-      }
       auto input_positions_tensor = signature.InputTensor(input_positions_name);
       if (!input_positions_tensor) {
         return absl::InternalError(input_positions_tensor.Error().Message());

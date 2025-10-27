@@ -163,12 +163,10 @@ absl::Status EndOfMultiModalEmbedding::Initialize() {
 
   LITERT_ASSIGN_OR_RETURN(litert::CompiledModel compiled_model,
                           litert::CompiledModel::Create(env_, model_, options));
-  LITERT_ASSIGN_OR_RETURN(auto signatures, model_.GetSignatures());
-
-  if (signatures.size() != 1) {
+  if (auto num_signatures = model_.GetNumSignatures(); num_signatures != 1) {
     return absl::InvalidArgumentError(absl::StrCat(
         "The Embedding model must have exactly one signature but got ",
-        signatures.size()));
+        num_signatures));
   }
 
   LITERT_ASSIGN_OR_RETURN(auto input_buffers, compiled_model.CreateInputBuffers(

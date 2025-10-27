@@ -213,9 +213,10 @@ absl::StatusOr<int> ApplyGreedySampling(const TensorBuffer& decoded_logits) {
 // Returns true if the transformer model has a per layer embedder input buffer.
 litert::Expected<bool> HasPerLayerEmbedder(
     const litert::Model& transformer_model) {
-  LITERT_ASSIGN_OR_RETURN(litert::Signature prefill_signature,
-                          transformer_model.FindSignature(kPrefillSignature));
-  for (auto input_name : prefill_signature.InputNames()) {
+  LITERT_ASSIGN_OR_RETURN(
+      auto input_names,
+      transformer_model.GetSignatureInputNames(kPrefillSignature));
+  for (auto input_name : input_names) {
     if (kPerLayerEmbedderTensor == input_name) {
       return true;
     }

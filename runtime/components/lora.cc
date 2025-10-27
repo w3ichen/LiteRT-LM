@@ -40,9 +40,8 @@ absl::StatusOr<std::unique_ptr<LoRA>> LoRA::Create(
 
 absl::Status LoRA::Init() {
   // Get the input names from the default signature.
-  LITERT_ASSIGN_OR_RETURN_ABSL(auto signature,
-                               model_.FindSignature(kDecodeSignatureRunner));
-  auto input_names = signature.InputNames();
+  LITERT_ASSIGN_OR_RETURN_ABSL(
+      auto input_names, model_.GetSignatureInputNames(kDecodeSignatureRunner));
 
   for (const auto& input_name : input_names) {
     if (!IsLoRAInputName(input_name)) {

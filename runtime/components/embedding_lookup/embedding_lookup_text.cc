@@ -260,7 +260,7 @@ absl::Status EmbeddingLookupText::Initialize() {
 
   if (signature_key_.has_value()) {
     bool found = false;
-    for (const litert::Signature& signature : signatures) {
+    for (const auto& signature : signatures) {
       if (signature.Key() == signature_key_.value()) {
         found = true;
         break;
