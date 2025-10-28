@@ -13,50 +13,49 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.ai.edge.litertlm;
+package com.google.ai.edge.litertlm
 
 /** A wrapper for the native JNI methods. */
-final class LiteRtLmJni {
+internal object LiteRtLmJni {
 
-  static {
-    System.loadLibrary("litertlm_jni");
+  init {
+    System.loadLibrary("litertlm_jni")
   }
-
-  private LiteRtLmJni() {}
 
   /**
    * Creates a new LiteRT-LM engine.
    *
    * @param modelPath The path to the model file.
    * @param backend The backend to use for the engine. It should be the string of the corresponding
-   *     value in `litert::lm::Backend`.
+   *   value in `litert::lm::Backend`.
    * @param visionBackend The backend to use for the vision executor. If empty, vision executor will
-   *     not be initialized. It should be the string of the corresponding value in
-   *     `litert::lm::Backend`.
+   *   not be initialized. It should be the string of the corresponding value in
+   *   `litert::lm::Backend`.
    * @param audioBackend The backend to use for the audio executor. If empty, audio executor will
-   *     not be initialized. It should be the string of the corresponding value in
-   *     `litert::lm::Backend`.
+   *   not be initialized. It should be the string of the corresponding value in
+   *   `litert::lm::Backend`.
    * @param maxNumTokens The maximum number of tokens to be processed by the engine. When
-   *     non-positive, use the engine's default.
+   *   non-positive, use the engine's default.
    * @param enableBenchmark Whether to enable benchmark mode or not.
    * @param cacheDir The directory for cache files.
    * @return A pointer to the native engine instance.
    */
-  public static native long nativeCreateEngine(
-      String modelPath,
-      String backend,
-      String visionBackend,
-      String audioBackend,
-      int maxNumTokens,
-      String cacheDir,
-      boolean enableBenchmark);
+  external fun nativeCreateEngine(
+    modelPath: String,
+    backend: String,
+    visionBackend: String,
+    audioBackend: String,
+    maxNumTokens: Int,
+    cacheDir: String,
+    enableBenchmark: Boolean,
+  ): Long
 
   /**
    * Delete the LiteRT-LM engine.
    *
    * @param enginePointer A pointer to the native engine instance.
    */
-  public static native void nativeDeleteEngine(long enginePointer);
+  external fun nativeDeleteEngine(enginePointer: Long)
 
   /**
    * Creates a new LiteRT-LM session.
@@ -65,14 +64,14 @@ final class LiteRtLmJni {
    * @param samplerConfig The sampler configuration.
    * @return A pointer to the native session instance.
    */
-  public static native long nativeCreateSession(long enginePointer, SamplerConfig samplerConfig);
+  external fun nativeCreateSession(enginePointer: Long, samplerConfig: SamplerConfig?): Long
 
   /**
    * Delete the LiteRT-LM session.
    *
    * @param sessionPointer A pointer to the native session instance.
    */
-  public static native void nativeDeleteSession(long sessionPointer);
+  external fun nativeDeleteSession(sessionPointer: Long)
 
   /**
    * Runs the prefill step for the given input data.
@@ -81,8 +80,7 @@ final class LiteRtLmJni {
    * @param inputData An array of {@link InputData} to be processed by the model.
    * @throws LiteRtLmJniException if the underlying native method fails.
    */
-  @SuppressWarnings("AvoidObjectArrays") // Array is simpler for JNI
-  public static native void nativeRunPrefill(long sessionPointer, InputData[] inputData);
+  external fun nativeRunPrefill(sessionPointer: Long, inputData: Array<InputData>)
 
   /**
    * Runs the decode step.
@@ -91,7 +89,7 @@ final class LiteRtLmJni {
    * @return The generated content.
    * @throws LiteRtLmJniException if the underlying native method fails.
    */
-  public static native String nativeRunDecode(long sessionPointer);
+  external fun nativeRunDecode(sessionPointer: Long): String
 
   /**
    * Generates content from the given input data.
@@ -100,8 +98,7 @@ final class LiteRtLmJni {
    * @param inputData An array of {@link InputData} to be processed by the model.
    * @return The generated content.
    */
-  @SuppressWarnings("AvoidObjectArrays") // Array is simpler for JNI
-  public static native String nativeGenerateContent(long sessionPointer, InputData[] inputData);
+  external fun nativeGenerateContent(sessionPointer: Long, inputData: Array<InputData>): String
 
   /**
    * Generates content from the given input data in a streaming fashion.
@@ -112,9 +109,11 @@ final class LiteRtLmJni {
    * @param inputData An array of {@link InputData} to be processed by the model.
    * @param callback The callback to receive the streaming responses.
    */
-  @SuppressWarnings("AvoidObjectArrays") // Array is simpler for JNI
-  public static native void nativeGenerateContentStream(
-      long sessionPointer, InputData[] inputData, JniInferenceCallback callback);
+  external fun nativeGenerateContentStream(
+    sessionPointer: Long,
+    inputData: Array<InputData>,
+    callback: JniInferenceCallback,
+  )
 
   /**
    * Callback for the nativeGenerateContentStream.
@@ -127,10 +126,10 @@ final class LiteRtLmJni {
      *
      * @param response The response string.
      */
-    void onNext(String response);
+    fun onNext(response: String)
 
     /** Called when the inference is done and finished successfully. */
-    void onDone();
+    fun onDone()
 
     /**
      * Called when an error occurs.
@@ -138,7 +137,7 @@ final class LiteRtLmJni {
      * @param statusCode The int value of the underlying Status::code returned.
      * @param message The message.
      */
-    void onError(int statusCode, String message);
+    fun onError(statusCode: Int, message: String)
   }
 
   /**
@@ -146,7 +145,7 @@ final class LiteRtLmJni {
    *
    * @param sessionPointer A pointer to the native session instance.
    */
-  public static native void nativeCancelProcess(long sessionPointer);
+  external fun nativeCancelProcess(sessionPointer: Long)
 
   /**
    * Creates a new LiteRT-LM conversation.
@@ -155,22 +154,23 @@ final class LiteRtLmJni {
    * @param samplerConfig The sampler configuration.
    * @param systemMessageJsonString The system instruction to be used in the conversation.
    * @param toolsDescriptionJsonString A json string of a list of tool definitions (Open API json).
-   *     could be used.
+   *   could be used.
    * @return A pointer to the native conversation instance.
    */
-  public static native long nativeCreateConversation(
-      long enginePointer,
-      SamplerConfig samplerConfig,
-      String systemMessageJsonString,
-      String toolsDescriptionJsonString,
-      boolean forceDisableConversationConstraintDecoding);
+  external fun nativeCreateConversation(
+    enginePointer: Long,
+    samplerConfig: SamplerConfig?,
+    systemMessageJsonString: String,
+    toolsDescriptionJsonString: String,
+    forceDisableConversationConstraintDecoding: Boolean,
+  ): Long
 
   /**
    * Deletes the LiteRT-LM conversation.
    *
    * @param conversationPointer A pointer to the native conversation instance.
    */
-  public static native void nativeDeleteConversation(long conversationPointer);
+  external fun nativeDeleteConversation(conversationPointer: Long)
 
   /**
    * Send message from the given input data asynchronously.
@@ -181,8 +181,11 @@ final class LiteRtLmJni {
    * @param messageJsonString The message to be processed by the native conversation instance.
    * @param callback The callback to receive the streaming responses.
    */
-  public static native void nativeSendMessageAsync(
-      long conversationPointer, String messageJsonString, JniMessageCallback callback);
+  external fun nativeSendMessageAsync(
+    conversationPointer: Long,
+    messageJsonString: String,
+    callback: JniMessageCallback,
+  )
 
   /**
    * Send message from the given input data synchronously.
@@ -191,14 +194,14 @@ final class LiteRtLmJni {
    * @param messageJsonString The message to be processed by the native conversation instance.
    * @return The response message in JSON string format.
    */
-  public static native String nativeSendMessage(long conversationPointer, String messageJsonString);
+  external fun nativeSendMessage(conversationPointer: Long, messageJsonString: String): String
 
   /**
    * Cancels the ongoing conversation process.
    *
    * @param conversationPointer A pointer to the native conversation instance.
    */
-  public static native void nativeConversationCancelProcess(long conversationPointer);
+  external fun nativeConversationCancelProcess(conversationPointer: Long)
 
   /**
    * Gets the benchmark info for the conversation.
@@ -207,7 +210,7 @@ final class LiteRtLmJni {
    * @return The benchmark info.
    * @throws LiteRtLmJniException if the underlying native method fails.
    */
-  public static native BenchmarkInfo nativeConversationGetBenchmarkInfo(long conversationPointer);
+  external fun nativeConversationGetBenchmarkInfo(conversationPointer: Long): BenchmarkInfo
 
   /**
    * Callback for the nativeSendMessageAsync.
@@ -220,10 +223,10 @@ final class LiteRtLmJni {
      *
      * @param messageJsonString The message in JSON string format.
      */
-    void onMessage(String messageJsonString);
+    fun onMessage(messageJsonString: String)
 
     /** Called when the message stream is done. */
-    void onDone();
+    fun onDone()
 
     /**
      * Called when an error occurs.
@@ -231,6 +234,6 @@ final class LiteRtLmJni {
      * @param statusCode The int value of the underlying Status::code returned.
      * @param message The message.
      */
-    void onError(int statusCode, String message);
+    fun onError(statusCode: Int, message: String)
   }
 }

@@ -16,10 +16,7 @@ load("@rules_kotlin//kotlin:android.bzl", "kt_android_library")
 
 kt_android_library(
     name = "litertlm",
-    srcs = glob([
-        "*.kt",
-        "*.java",
-    ]),
+    srcs = glob(["*.kt"]),
     manifest = "AndroidManifest.xml",
     deps = [
         "@rules_kotlin//kotlin/compiler:kotlin-reflect",

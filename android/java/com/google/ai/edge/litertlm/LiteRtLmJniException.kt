@@ -13,17 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.google.ai.edge.litertlm;
+package com.google.ai.edge.litertlm
 
 /**
  * Exception thrown from the LiteRT LM JNI layer.
  *
- * <p>The JVM has no way to statically verify that the native C/C++ code will only throw exceptions
+ * The JVM has no way to statically verify that the native C/C++ code will only throw exceptions
  * declared in the Java method's throws signature. Hence, throwing an exception extending the
  * RuntimeException (an unchecked exception).
  */
-public class LiteRtLmJniException extends RuntimeException {
-  public LiteRtLmJniException(String message) {
-    super(message);
-  }
-}
+class LiteRtLmJniException(message: String) : RuntimeException(message)
