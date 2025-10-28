@@ -77,6 +77,146 @@ const absl::Duration kWaitUntilDoneTimeout = absl::Minutes(10);
 
 namespace {
 
+// Helper to process the sampler backend string and return a sampler backend
+// if possible. Otherwise, return std::nullopt.
+std::optional<Backend> GetSamplerBackend(const LiteRtLmSettings& settings) {
+  const std::string& sampler_backend_str = settings.sampler_backend;
+  if (sampler_backend_str.empty()) {
+    return std::nullopt;
+  }
+  const absl::StatusOr<Backend> sampler_backend =
+      GetBackendFromString(sampler_backend_str);
+  if (!sampler_backend.ok()) {
+    ABSL_LOG(WARNING) << "Ignore invalid sampler backend string: "
+                      << sampler_backend.status();
+    return std::nullopt;
+  }
+  return *sampler_backend;
+}
+
+// Creates the EngineSettings from the LiteRtLmSettings.
+absl::StatusOr<EngineSettings> CreateEngineSettings(
+    const LiteRtLmSettings& settings) {
+  const std::string model_path = settings.model_path;
+  if (model_path.empty()) {
+    return absl::InvalidArgumentError("Model path is empty.");
+  }
+  ABSL_LOG(INFO) << "Model path: " << model_path;
+  ASSIGN_OR_RETURN(ModelAssets model_assets,  // NOLINT
+                   ModelAssets::Create(model_path));
+  auto backend_str = settings.backend;
+  ABSL_LOG(INFO) << "Choose backend: " << backend_str;
+  ASSIGN_OR_RETURN(Backend backend,
+                   litert::lm::GetBackendFromString(backend_str));
+  std::optional<Backend> vision_backend = std::nullopt;
+  if (settings.vision_backend.has_value()) {
+    ABSL_LOG(INFO) << "Provided vision backend: " << *settings.vision_backend;
+    ASSIGN_OR_RETURN(vision_backend, litert::lm::GetBackendFromString(
+                                         *settings.vision_backend));
+  }
+  std::optional<Backend> audio_backend = std::nullopt;
+  if (settings.audio_backend.has_value()) {
+    ABSL_LOG(INFO) << "Provided audio backend: " << *settings.audio_backend;
+    ASSIGN_OR_RETURN(audio_backend,
+                     litert::lm::GetBackendFromString(*settings.audio_backend));
+  }
+
+  ASSIGN_OR_RETURN(
+      EngineSettings engine_settings,
+      EngineSettings::CreateDefault(std::move(model_assets), backend,
+                                    vision_backend, audio_backend));
+  if (settings.max_num_tokens > 0) {
+    engine_settings.GetMutableMainExecutorSettings().SetMaxNumTokens(
+        settings.max_num_tokens);
+  }
+  if (settings.force_f32) {
+    engine_settings.GetMutableMainExecutorSettings().SetActivationDataType(
+        litert::lm::ActivationDataType::FLOAT32);
+  }
+  if (settings.disable_cache) {
+    engine_settings.GetMutableMainExecutorSettings().SetCacheDir(":nocache");
+  }
+  if (backend == Backend::CPU && settings.num_cpu_threads > 0) {
+    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
+    ASSIGN_OR_RETURN(
+        auto cpu_settings,
+        executor_settings.MutableBackendConfig<litert::lm::CpuConfig>());
+    cpu_settings.number_of_threads = settings.num_cpu_threads;
+    executor_settings.SetBackendConfig(cpu_settings);
+  }
+  if (backend == Backend::GPU) {
+    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
+    ASSIGN_OR_RETURN(
+        auto gpu_settings,
+        executor_settings.MutableBackendConfig<litert::lm::GpuConfig>());
+    gpu_settings.external_tensor_mode = settings.gpu_external_tensor_mode;
+    executor_settings.SetBackendConfig(gpu_settings);
+  }
+  const std::optional<Backend> sampler_backend = GetSamplerBackend(settings);
+  if (sampler_backend.has_value()) {
+    engine_settings.GetMutableMainExecutorSettings().SetSamplerBackend(
+        *sampler_backend);
+  }
+
+  AdvancedSettings advanced_settings{
+      .prefill_batch_sizes = settings.prefill_batch_sizes,
+      .num_output_candidates = settings.num_output_candidates,
+      .configure_magic_numbers = settings.configure_magic_numbers,
+      .verify_magic_numbers = settings.verify_magic_numbers,
+      .clear_kv_cache_before_prefill = settings.clear_kv_cache_before_prefill,
+      .num_logits_to_print_after_decode =
+          static_cast<uint32_t>(settings.num_logits_to_print_after_decode),
+      .gpu_madvise_original_shared_tensors =
+          settings.gpu_madvise_original_shared_tensors,
+  };
+  if (advanced_settings != AdvancedSettings()) {
+    engine_settings.GetMutableMainExecutorSettings().SetAdvancedSettings(
+        advanced_settings);
+  }
+
+  ABSL_LOG(INFO) << "executor_settings: "
+                 << engine_settings.GetMainExecutorSettings();
+
+  if (engine_settings.GetVisionExecutorSettings().has_value()) {
+    ABSL_LOG(INFO) << "vision_executor_settings: "
+                   << engine_settings.GetVisionExecutorSettings().value();
+  } else {
+    ABSL_LOG(INFO) << "vision_executor_settings: not set";
+  }
+  if (engine_settings.GetAudioExecutorSettings().has_value()) {
+    ABSL_LOG(INFO) << "audio_executor_settings: "
+                   << engine_settings.GetAudioExecutorSettings().value();
+  } else {
+    ABSL_LOG(INFO) << "audio_executor_settings: not set";
+  }
+
+  if (settings.benchmark) {
+    if (settings.multi_turns) {
+      ABSL_LOG(FATAL)
+          << "Benchmarking with multi-turns input is not supported.";
+    }
+
+    litert::lm::proto::BenchmarkParams benchmark_params;
+    benchmark_params.set_num_prefill_tokens(settings.benchmark_prefill_tokens);
+    benchmark_params.set_num_decode_tokens(settings.benchmark_decode_tokens);
+    engine_settings.GetMutableBenchmarkParams() = benchmark_params;
+  }
+
+  return engine_settings;
+}
+
+// Creates the SessionConfig from the LiteRtLmSettings.
+SessionConfig CreateSessionConfig(const LiteRtLmSettings& settings) {
+  // Set the session config.
+  auto session_config = litert::lm::SessionConfig::CreateDefault();
+  session_config.SetNumOutputCandidates(settings.num_output_candidates);
+  const std::optional<Backend> sampler_backend = GetSamplerBackend(settings);
+  if (sampler_backend.has_value()) {
+    session_config.SetSamplerBackend(*sampler_backend);
+  }
+  return session_config;
+}
+
 absl::Status PrintJsonMessage(const JsonMessage& message,
                               std::stringstream& captured_output,
                               bool streaming = false) {
@@ -282,10 +422,6 @@ void RunScoreText(litert::lm::Engine* llm, litert::lm::Engine::Session* session,
 }  // namespace
 
 absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
-  const std::string model_path = settings.model_path;
-  if (model_path.empty()) {
-    return absl::InvalidArgumentError("Model path is empty.");
-  }
 
   std::unique_ptr<tflite::profiling::memory::MemoryUsageMonitor> mem_monitor;
   if (settings.report_peak_memory_footprint) {
@@ -294,122 +430,16 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
             kMemoryCheckIntervalMs);
     mem_monitor->Start();
   }
-  ABSL_LOG(INFO) << "Model path: " << model_path;
-  ASSIGN_OR_RETURN(ModelAssets model_assets,  // NOLINT
-                   ModelAssets::Create(model_path));
-  auto backend_str = settings.backend;
-  ABSL_LOG(INFO) << "Choose backend: " << backend_str;
-  ASSIGN_OR_RETURN(Backend backend,
-                   litert::lm::GetBackendFromString(backend_str));
-  std::optional<Backend> vision_backend = std::nullopt;
-  if (settings.vision_backend.has_value()) {
-    ABSL_LOG(INFO) << "Provided vision backend: " << *settings.vision_backend;
-    ASSIGN_OR_RETURN(vision_backend, litert::lm::GetBackendFromString(
-                                         *settings.vision_backend));
-  }
-  std::optional<Backend> audio_backend = std::nullopt;
-  if (settings.audio_backend.has_value()) {
-    ABSL_LOG(INFO) << "Provided audio backend: " << *settings.audio_backend;
-    ASSIGN_OR_RETURN(audio_backend,
-                     litert::lm::GetBackendFromString(*settings.audio_backend));
-  }
 
-  ASSIGN_OR_RETURN(
-      EngineSettings engine_settings,
-      EngineSettings::CreateDefault(std::move(model_assets), backend,
-                                    vision_backend, audio_backend));
-  if (settings.max_num_tokens > 0) {
-    engine_settings.GetMutableMainExecutorSettings().SetMaxNumTokens(
-        settings.max_num_tokens);
-  }
-  if (settings.force_f32) {
-    engine_settings.GetMutableMainExecutorSettings().SetActivationDataType(
-        litert::lm::ActivationDataType::FLOAT32);
-  }
-  if (settings.disable_cache) {
-    engine_settings.GetMutableMainExecutorSettings().SetCacheDir(":nocache");
-  }
-  if (backend == Backend::CPU && settings.num_cpu_threads > 0) {
-    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
-    ASSIGN_OR_RETURN(
-        auto cpu_settings,
-        executor_settings.MutableBackendConfig<litert::lm::CpuConfig>());
-    cpu_settings.number_of_threads = settings.num_cpu_threads;
-    executor_settings.SetBackendConfig(cpu_settings);
-  }
-  if (backend == Backend::GPU) {
-    auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
-    ASSIGN_OR_RETURN(
-        auto gpu_settings,
-        executor_settings.MutableBackendConfig<litert::lm::GpuConfig>());
-    gpu_settings.external_tensor_mode = settings.gpu_external_tensor_mode;
-    executor_settings.SetBackendConfig(gpu_settings);
-  }
-  auto session_config = litert::lm::SessionConfig::CreateDefault();
-  session_config.SetNumOutputCandidates(settings.num_output_candidates);
-  auto sampler_backend_str = settings.sampler_backend;
-  if (!sampler_backend_str.empty()) {
-    auto sampler_backend =
-        litert::lm::GetBackendFromString(settings.sampler_backend);
-    if (!sampler_backend.ok()) {
-      ABSL_LOG(WARNING) << "Ignore invalid sampler backend string: "
-                        << sampler_backend.status();
-    } else {
-      session_config.SetSamplerBackend(*sampler_backend);
-      auto& executor_settings =
-          engine_settings.GetMutableMainExecutorSettings();
-      executor_settings.SetSamplerBackend(*sampler_backend);
-    }
-  }
-
-  AdvancedSettings advanced_settings{
-      .prefill_batch_sizes = settings.prefill_batch_sizes,
-      .num_output_candidates = session_config.GetNumOutputCandidates(),
-      .configure_magic_numbers = settings.configure_magic_numbers,
-      .verify_magic_numbers = settings.verify_magic_numbers,
-      .clear_kv_cache_before_prefill = settings.clear_kv_cache_before_prefill,
-      .num_logits_to_print_after_decode =
-          static_cast<uint32_t>(settings.num_logits_to_print_after_decode),
-      .gpu_madvise_original_shared_tensors =
-          settings.gpu_madvise_original_shared_tensors,
-  };
-  if (advanced_settings != AdvancedSettings()) {
-    engine_settings.GetMutableMainExecutorSettings().SetAdvancedSettings(
-        advanced_settings);
-  }
-
-  ABSL_LOG(INFO) << "executor_settings: "
-                 << engine_settings.GetMainExecutorSettings();
-
-  if (engine_settings.GetVisionExecutorSettings().has_value()) {
-    ABSL_LOG(INFO) << "vision_executor_settings: "
-                   << engine_settings.GetVisionExecutorSettings().value();
-  } else {
-    ABSL_LOG(INFO) << "vision_executor_settings: not set";
-  }
-  if (engine_settings.GetAudioExecutorSettings().has_value()) {
-    ABSL_LOG(INFO) << "audio_executor_settings: "
-                   << engine_settings.GetAudioExecutorSettings().value();
-  } else {
-    ABSL_LOG(INFO) << "audio_executor_settings: not set";
-  }
-
-  if (settings.benchmark) {
-    if (settings.multi_turns) {
-      ABSL_LOG(FATAL)
-          << "Benchmarking with multi-turns input is not supported.";
-    }
-
-    litert::lm::proto::BenchmarkParams benchmark_params;
-    benchmark_params.set_num_prefill_tokens(settings.benchmark_prefill_tokens);
-    benchmark_params.set_num_decode_tokens(settings.benchmark_decode_tokens);
-    engine_settings.GetMutableBenchmarkParams() = benchmark_params;
-  }
-
+  // Get the engine settings and create the engine.
+  ASSIGN_OR_RETURN(EngineSettings engine_settings,
+                   CreateEngineSettings(settings));
   ABSL_LOG(INFO) << "Creating engine";
   ASSIGN_OR_RETURN(auto engine,
                    litert::lm::Engine::CreateEngine(std::move(engine_settings),
                                                     settings.input_prompt));
+  // Get the session config.
+  const SessionConfig session_config = CreateSessionConfig(settings);
 
   // Session and Conversation are mutually exclusive. Only when
   // settings.score_target_text is set, we will create a Session to run the
