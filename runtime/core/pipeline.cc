@@ -42,7 +42,6 @@
 #include "runtime/components/stop_token_detector.h"
 #include "runtime/components/tokenizer.h"
 #include "runtime/engine/io_types.h"
-#include "runtime/executor/executor_settings_base.h"
 #include "runtime/executor/llm_executor.h"
 #include "runtime/executor/llm_executor_io_types.h"
 #include "runtime/executor/llm_executor_settings.h"
@@ -339,8 +338,7 @@ absl::StatusOr<Responses> DecodeLoop(
     auto* compiled_model_executor =
         dynamic_cast<LlmLiteRtCompiledModelExecutor*>(&executor);
     if (compiled_model_executor != nullptr) {
-      compiled_model_executor->InitializeSampler(num_output_candidates)
-          .IgnoreError();
+      compiled_model_executor->InitializeSampler().IgnoreError();
     }
     benchmark_decode_token_count =
         benchmark_info->GetBenchmarkParams().num_decode_tokens();

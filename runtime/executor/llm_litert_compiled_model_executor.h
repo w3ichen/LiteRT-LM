@@ -114,9 +114,13 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
   absl::StatusOr<int> GetVocabSize() override;
 
   // Initializes the sampler.
-  absl::Status InitializeSampler(int batch_size);
+  absl::Status InitializeSampler();
 
   using LogitsDataType = ActivationDataType;
+
+  const ProcessedTokens& processed_tokens_for_testing() const {
+    return processed_tokens_;
+  }
 
  protected:
   LlmLiteRtCompiledModelExecutor(
@@ -131,6 +135,12 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
           input_kv_cache_buffers,
       absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
           output_kv_cache_buffers,
+      std::optional<
+          absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>>
+          decode_input_kv_cache_buffers,
+      std::optional<
+          absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>>
+          decode_output_kv_cache_buffers,
       SortedPrefillSignatureMap prefill_signature_map,
       ModelSignatures signatures, int batch_size, std::string weight_cache_path,
       std::unique_ptr<EmbeddingLookupManager> embedding_lookup = nullptr,
@@ -147,6 +157,8 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
         kv_cache_buffers_2_(std::move(output_kv_cache_buffers)),
         input_kv_cache_buffers_(&kv_cache_buffers_1_),
         output_kv_cache_buffers_(&kv_cache_buffers_2_),
+        decode_kv_cache_buffers_1_(std::move(decode_input_kv_cache_buffers)),
+        decode_kv_cache_buffers_2_(std::move(decode_output_kv_cache_buffers)),
         prefill_signature_map_(std::move(prefill_signature_map)),
         signatures_(signatures),
         output_batch_size_(batch_size),
@@ -169,17 +181,24 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
   // token and uses the specified 'step' as the current time step.  The
   // logits from the decode step are stored in the 'logits' output buffer of
   // the transformer model when this function returns absl::OkStatus().
-  absl::Status DecodeInternal(int step, std::shared_ptr<TokenData> token,
-                              TensorBuffer& output_logits);
+  absl::Status DecodeInternal(
+      int step, const std::vector<std::shared_ptr<TokenData>>& token,
+      TensorBuffer& output_logits);
 
   // Create Prefill input buffers for a given signature.
   absl::Status CreatePrefillInputBuffers(absl::string_view prefill_signature);
 
   // Fills the input buffer from the unprocessed token.
   absl::Status FillInputBufferWithToken(
-      std::shared_ptr<TokenData> unprocessed_token,
+      const std::vector<std::shared_ptr<TokenData>>& unprocessed_token,
       ::litert::TensorBuffer& input_buffer,
       bool is_per_layer_embedding = false);
+
+  // Prepares the first decode step.
+  // When output_batch_size_ > 1, It broadcasts KV cache buffers to
+  // output_batch_size_ times for the rest of the decode steps.
+  // When output_batch_size_ == 1, It doesn't do anything.
+  absl::Status PrepareFirstDecode();
 
   // Gets the token to decode. If there is id provided in the inputs, it will be
   // returned as the token to decode. Otherwise, the next unprocessed token will
@@ -190,7 +209,7 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
   // Mark the pending token as processed if there is one, or adds the token as a
   // processed token.
   absl::Status ConsumePendingOrAddProcessedToken(
-      std::shared_ptr<TokenData> token);
+      const std::vector<std::shared_ptr<TokenData>>& token);
 
   LlmExecutorSettings executor_settings_;
   ::litert::Environment& env_;
@@ -210,6 +229,8 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
       decode_input_buffers_;
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
       decode_output_buffers_;
+  // KV cache double buffers because some GPU backends can't allocate one buffer
+  // for both read and write at the same time.
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
       kv_cache_buffers_1_;
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
@@ -218,6 +239,11 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
       input_kv_cache_buffers_;
   absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>*
       output_kv_cache_buffers_;
+  // KV cache (double) buffers used during decode when output_batch_size_ > 1.
+  std::optional<absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>>
+      decode_kv_cache_buffers_1_;
+  std::optional<absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>>
+      decode_kv_cache_buffers_2_;
 
   SortedPrefillSignatureMap prefill_signature_map_;
 
@@ -230,7 +256,9 @@ class LlmLiteRtCompiledModelExecutor : public LlmExecutor {
   // {batch_0_seq_0, batch_1_seq_0, batch_0_seq_1, batch_1_seq_1, ...}
   std::vector<int> sampled_ids_;
   // Output batch size for the sampled ids.
-  int output_batch_size_ = 0;
+  const int output_batch_size_;
+  // Whether decode has been run ever after prefill.
+  bool ran_decode_ = false;
 
   // Sampler for sampling logits.
   // For now, only CPU sampler is supported.

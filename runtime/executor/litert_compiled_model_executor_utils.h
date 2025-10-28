@@ -84,8 +84,8 @@ absl::StatusOr<ModelSignatures> GetModelSignaturesFromInputOutputNames(
 // input_tokens_name is the name of the input tokens signature, e.g. "token_ids"
 // for Gemma2 JAX and "tokens" for Gemma2 PyTorch.
 absl::StatusOr<SortedPrefillSignatureMap> GetPrefillRunnerSetFromModel(
-    const ::litert::Model& model, const std::string& signature_name_base,
-    const std::string& input_positions_name);
+    const ::litert::Model& model, absl::string_view signature_name_base,
+    absl::string_view input_positions_name);
 
 // Get a list of prefill work groups, each of which contains the signature
 // runner and prefill length for a single prefill call.

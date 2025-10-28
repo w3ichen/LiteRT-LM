@@ -961,10 +961,10 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::Decode(
   // the previous prefill or decode.
   auto [internal_start_step, pending_input_token] =
       processed_tokens_.GetNextUnprocessedToken();
-  if (pending_input_token == nullptr) {
+  if (pending_input_token.empty()) {
     return absl::InvalidArgumentError("No id available to be decoded.");
   }
-  RETURN_IF_ERROR(DecodeInternal(internal_start_step, pending_input_token));
+  RETURN_IF_ERROR(DecodeInternal(internal_start_step, pending_input_token[0]));
   RETURN_IF_ERROR(processed_tokens_.MarkPendingInputTokenAsProcessed());
 
   auto start_sample = absl::Now();
@@ -988,7 +988,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::Decode(
   // token).
 
   RETURN_IF_ERROR(
-      processed_tokens_.AddPendingInputToken(std::move(last_output_token)));
+      processed_tokens_.AddPendingInputToken({std::move(last_output_token)}));
   ++current_step_;
 
   output_tokens.Write(absl::MakeConstSpan({max_index}));
@@ -1058,7 +1058,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
     auto [internal_start_step, pending_input_token] =
         processed_tokens_.GetNextUnprocessedToken();
     int input_idx = 0;
-    if (pending_input_token != nullptr) {
+    if (!pending_input_token.empty()) {
       // We'll write any pending embedding directly into the transformer
       // embedding buffer.
       if (UseEmbeddingLookupManager()) {
@@ -1071,11 +1071,11 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
         float* transformer_embedding_buffer_ptr = static_cast<float*>(
             transformer_embedding_buffer_lock_and_addr.second);
         memcpy(transformer_embedding_buffer_ptr,
-               pending_input_token->embedding().data(),
-               pending_input_token->embedding().size() * sizeof(float));
+               pending_input_token[0]->embedding().data(),
+               pending_input_token[0]->embedding().size() * sizeof(float));
       }
 
-      prefill_input_ptr[input_idx] = pending_input_token->id();
+      prefill_input_ptr[input_idx] = pending_input_token[0]->id();
       prefill_input_pos_ptr[input_idx] = internal_start_step;
       RETURN_IF_ERROR(processed_tokens_.MarkPendingInputTokenAsProcessed());
       ++input_idx;
@@ -1108,7 +1108,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
               .prefill_input_buffers[LlmSignatures::kInputEmbeddings];
       RETURN_IF_ERROR(embedding_lookup_manager_.value()->LookupPrefill(
           processed_input_tokens, &embedding_buffer,
-          pending_input_token != nullptr ? 1 : 0));
+          pending_input_token.empty() ? 0 : 1));
       latency_stats_.prefill_embedder_inference_latency_us +=
           absl::ToInt64Microseconds(absl::Now() - start);
     }
@@ -1132,7 +1132,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
 
   // Add the last input token to the pending input token list.
   RETURN_IF_ERROR(
-      processed_tokens_.AddPendingInputToken(std::move(last_input_token)));
+      processed_tokens_.AddPendingInputToken({std::move(last_input_token)}));
   ++current_step_;
 
   if (!UseEmbeddingLookupManager()) {
@@ -1219,7 +1219,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::PrefillInternal(
 }
 
 absl::Status LlmLiteRtNpuCompiledModelExecutor::DecodeInternal(
-    const int step, const std::shared_ptr<TokenData> token) {
+    int step, std::shared_ptr<TokenData> token) {
   auto start_prepare_inputs = absl::Now();
 
   int id = token->id();

@@ -230,8 +230,7 @@ class LlmLiteRtNpuCompiledModelExecutor : public LlmExecutor {
   // token and uses the specified 'step' as the current time step.  The
   // logits from the decode step are stored in the 'logits' output buffer of
   // the transformer model when this function returns absl::OkStatus().
-  absl::Status DecodeInternal(const int step,
-                              const std::shared_ptr<TokenData> token);
+  absl::Status DecodeInternal(int step, std::shared_ptr<TokenData> token);
 
   // Creates the context for the embedder model.  Instead of creating new
   // output buffers for the embedder, the context will use the input buffers

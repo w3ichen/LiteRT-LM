@@ -32,6 +32,7 @@
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "litert/cc/litert_element_type.h"  // from @litert
 #include "litert/cc/litert_expected.h"  // from @litert
+#include "litert/cc/litert_macros.h"  // from @litert
 #include "litert/cc/litert_model.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
 #include "runtime/components/model_resources.h"
@@ -142,29 +143,24 @@ absl::StatusOr<ModelSignatures> GetModelSignaturesFromInputOutputNames(
 }
 
 absl::StatusOr<SortedPrefillSignatureMap> GetPrefillRunnerSetFromModel(
-    const ::litert::Model& model, const std::string& signature_name_base,
-    const std::string& input_positions_name) {
+    const ::litert::Model& model, absl::string_view signature_name_base,
+    absl::string_view input_positions_name) {
   SortedPrefillSignatureMap prefill_runner_set;
   auto signatures = model.GetSignatures();
   for (auto& signature : *signatures) {
     if (auto signature_key = signature.Key();
         absl::StartsWith(signature_key, signature_name_base)) {
-      auto input_positions_tensor = signature.InputTensor(input_positions_name);
-      if (!input_positions_tensor) {
-        return absl::InternalError(input_positions_tensor.Error().Message());
-      }
-      auto ranked_tensor_type = input_positions_tensor->RankedTensorType();
-      if (!ranked_tensor_type) {
-        return absl::InternalError(ranked_tensor_type.Error().Message());
-      }
-
-      if (ranked_tensor_type->Layout().Rank() == 2) {
+      LITERT_ASSIGN_OR_RETURN(auto input_positions_tensor,
+                              signature.InputTensor(input_positions_name));
+      LITERT_ASSIGN_OR_RETURN(auto ranked_tensor_type,
+                              input_positions_tensor.RankedTensorType());
+      if (ranked_tensor_type.Layout().Rank() == 2) {
         // [batch_size, max_seq_len]
-        prefill_runner_set[ranked_tensor_type->Layout().Dimensions()[1]] =
+        prefill_runner_set[ranked_tensor_type.Layout().Dimensions()[1]] =
             std::string(signature_key);
-      } else if (ranked_tensor_type->Layout().Rank() == 1) {
+      } else if (ranked_tensor_type.Layout().Rank() == 1) {
         // [max_seq_len]
-        prefill_runner_set[ranked_tensor_type->Layout().Dimensions()[0]] =
+        prefill_runner_set[ranked_tensor_type.Layout().Dimensions()[0]] =
             std::string(signature_key);
       } else {
         return absl::FailedPreconditionError(
@@ -208,27 +204,26 @@ GetOptimizedPrefillWorkGroups(
 }
 
 absl::Status InitializeAttentionMask(litert::TensorBuffer& mask, bool is_f16) {
-  auto mask_size = mask.PackedSize();
-  RET_CHECK(mask_size) << "Failed to get attention mask buffer size.";
-  auto mask_tensor_type = mask.TensorType();
-  RET_CHECK(mask_tensor_type) << "Failed to get attention mask tensor type.";
-  auto mask_lock_and_addr = litert::TensorBufferScopedLock::Create(
-      mask, litert::TensorBuffer::LockMode::kWrite);
-  RET_CHECK(mask_lock_and_addr) << "Failed to lock attention mask buffer.";
+  LITERT_ASSIGN_OR_RETURN(auto mask_size, mask.PackedSize());
+  LITERT_ASSIGN_OR_RETURN(auto mask_tensor_type, mask.TensorType());
+  LITERT_ASSIGN_OR_RETURN(auto mask_lock_and_addr,
+                          litert::TensorBufferScopedLock::Create(
+                              mask, litert::TensorBuffer::LockMode::kWrite));
 
-  switch (mask_tensor_type->ElementType()) {
-    case litert::ElementType::Bool: {
+  switch (mask_tensor_type.ElementType()) {
+    case litert::ElementType::Bool:
       // Boolean mask: Default value = false.
-      memset(mask_lock_and_addr->second, 0, *mask_size);
-    } break;
+      memset(mask_lock_and_addr.second, 0, mask_size);
+      break;
     case litert::ElementType::Float32: {
       // Float mask: Default value is based on precision.
       // Default value reference:
       // third_party/odml/infra/genai/inference/ml_drift/llm/tasks/apply_attention_mask_test_util.cc
-      float* mask_ptr = static_cast<float*>(mask_lock_and_addr->second);
-      std::fill(mask_ptr, mask_ptr + *mask_size / sizeof(float),
+      float* mask_ptr = static_cast<float*>(mask_lock_and_addr.second);
+      std::fill(mask_ptr, mask_ptr + mask_size / sizeof(float),
                 is_f16 ? -45824 : -0.7f * std::numeric_limits<float>::max());
-    } break;
+      break;
+    }
     default:
       return absl::InvalidArgumentError(
           "Unsupported attention mask data type.");
@@ -238,36 +233,42 @@ absl::Status InitializeAttentionMask(litert::TensorBuffer& mask, bool is_f16) {
 
 absl::Status FillAttentionMask(litert::TensorBuffer& mask, int start_timestep,
                                int steps) {
-  auto mask_tensor_type = mask.TensorType();
-  RET_CHECK(mask_tensor_type) << "Failed to get attention mask tensor type.";
-  RET_CHECK_EQ(mask_tensor_type->Layout().Rank(), 4)
+  LITERT_ASSIGN_OR_RETURN(auto mask_tensor_type, mask.TensorType());
+  RET_CHECK_EQ(mask_tensor_type.Layout().Rank(), 4)
           .SetCode(absl::StatusCode::kInvalidArgument)
       << "Attention mask must be 4D.";
-  int channel_size = mask_tensor_type->Layout().Dimensions()[3];
-  auto mask_lock_and_addr = litert::TensorBufferScopedLock::Create(
-      mask, litert::TensorBuffer::LockMode::kWrite);
-  RET_CHECK(mask_lock_and_addr) << "Failed to lock attention mask buffer.";
+  int batch_size = mask_tensor_type.Layout().Dimensions()[0];
+  int channel_size = mask_tensor_type.Layout().Dimensions()[3];
+  LITERT_ASSIGN_OR_RETURN(auto mask_size, mask.PackedSize());
+  LITERT_ASSIGN_OR_RETURN(auto mask_lock_and_addr,
+                          litert::TensorBufferScopedLock::Create(
+                              mask, litert::TensorBuffer::LockMode::kWrite));
 
-  for (int i = 0; i < steps; ++i) {
-    int current_step = start_timestep + i;
-    int offset = i * channel_size;
-    // For current step = n, we fill (n+1) positions for the mask sequence.
-    switch (mask_tensor_type->ElementType()) {
-      case litert::ElementType::Bool: {
+  int batch_offset = mask_size / batch_size;
+  if (mask_tensor_type.ElementType() == litert::ElementType::Bool) {
+    batch_offset /= sizeof(bool);
+  } else if (mask_tensor_type.ElementType() == litert::ElementType::Float32) {
+    batch_offset /= sizeof(float);
+  } else {
+    return absl::InvalidArgumentError("Unsupported attention mask data type.");
+  }
+
+  for (int b = 0; b < batch_size; ++b) {
+    for (int i = 0; i < steps; ++i) {
+      int current_step = start_timestep + i;
+      int offset = b * batch_offset + i * channel_size;
+      // For current step = n, we fill (n+1) positions for the mask sequence.
+      if (mask_tensor_type.ElementType() == litert::ElementType::Bool) {
         // Boolean mask: Fill value = true.
-        bool* mask_bool_ptr = static_cast<bool*>(mask_lock_and_addr->second);
-        std::fill(mask_bool_ptr + offset,
-                  mask_bool_ptr + offset + current_step + 1, true);
-      } break;
-      case litert::ElementType::Float32: {
+        bool* bool_ptr = static_cast<bool*>(mask_lock_and_addr.second);
+        std::fill(bool_ptr + offset, bool_ptr + offset + current_step + 1,
+                  true);
+      } else {  // litert::ElementType::Float32, checked above.
         // Float mask: Fill value = 0.0f.
-        float* mask_float_ptr = static_cast<float*>(mask_lock_and_addr->second);
-        std::fill(mask_float_ptr + offset,
-                  mask_float_ptr + offset + current_step + 1, 0.0f);
-      } break;
-      default:
-        return absl::InvalidArgumentError(
-            "Unsupported attention mask data type.");
+        float* float_ptr = static_cast<float*>(mask_lock_and_addr.second);
+        std::fill(float_ptr + offset, float_ptr + offset + current_step + 1,
+                  0.0f);
+      }
     }
   }
   return absl::OkStatus();

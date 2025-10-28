@@ -28,6 +28,7 @@
 #include "litert/cc/litert_element_type.h"  // from @litert
 #include "litert/cc/litert_environment.h"  // from @litert
 #include "litert/cc/litert_layout.h"  // from @litert
+#include "litert/cc/litert_ranked_tensor_type.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
 #include "litert/test/matchers.h"  // from @litert
 #include "runtime/components/model_resources.h"
@@ -304,6 +305,43 @@ TEST(LlmLiteRTCompiledModelExecutorUtilsTest, FillAttentionMask_Float32) {
   }
 }
 
+TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
+     FillAttentionMask_Float32_MultipleBatches) {
+  LITERT_ASSERT_OK_AND_ASSIGN(auto env, ::litert::Environment::Create({}));
+  // Mask shape: [batch=1, seq_len=4, 1, max_kv_len=10]
+  auto layout = ::litert::Layout(::litert::Dimensions({3, 4, 1, 10}));
+  RankedTensorType ranked_tensor_type(ElementType::Float32, std::move(layout));
+  auto mask_buffer =
+      TensorBuffer::CreateManaged(env.Get(), kLiteRtTensorBufferTypeHostMemory,
+                                  ranked_tensor_type, sizeof(float) * 120);
+  ASSERT_TRUE(mask_buffer);
+
+  // Initialize the mask with the default float value.
+  ASSERT_OK(InitializeAttentionMask(*mask_buffer, /*is_f16=*/false));
+
+  // Fill attention mask starting from timestep 5 for 2 steps.
+  // channel_size = 10
+  // i = 0: current_step = 5. Fills indices [0, 5] with 0.0f.
+  // i = 1: current_step = 6. Fills indices [10, 16] with 0.0f.
+  ASSERT_OK(FillAttentionMask(*mask_buffer, /*start_timestep=*/5, /*steps=*/2));
+
+  auto lock = litert::TensorBufferScopedLock::Create(
+      *mask_buffer, litert::TensorBuffer::LockMode::kRead);
+  ASSERT_TRUE(lock);
+  float* mask_ptr = static_cast<float*>(lock->second);
+  float init_val = -0.7f * std::numeric_limits<float>::max();
+
+  for (int b = 0; b < 3; ++b) {
+    for (int i = 0; i < 40; ++i) {
+      if ((i >= 0 && i <= 5) || (i >= 10 && i <= 16)) {
+        EXPECT_EQ(mask_ptr[b * 40 + i], 0.0f) << " at index " << i;
+      } else {
+        EXPECT_EQ(mask_ptr[b * 40 + i], init_val) << " at index " << i;
+      }
+    }
+  }
+}
+
 TEST(LlmLiteRTCompiledModelExecutorUtilsTest, FillAttentionMask_Bool) {
   LITERT_ASSERT_OK_AND_ASSIGN(auto env, ::litert::Environment::Create({}));
   // Mask shape: [batch=1, seq_len=3, 1, max_kv_len=8]
@@ -334,6 +372,43 @@ TEST(LlmLiteRTCompiledModelExecutorUtilsTest, FillAttentionMask_Bool) {
       EXPECT_TRUE(mask_ptr[i]) << " at index " << i;
     } else {
       EXPECT_FALSE(mask_ptr[i]) << " at index " << i;
+    }
+  }
+}
+
+TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
+     FillAttentionMask_Bool_MultipleBatches) {
+  LITERT_ASSERT_OK_AND_ASSIGN(auto env, ::litert::Environment::Create({}));
+  // Mask shape: [batch=1, seq_len=3, 1, max_kv_len=8]
+  auto layout = ::litert::Layout(::litert::Dimensions({4, 3, 1, 8}));
+  RankedTensorType ranked_tensor_type(ElementType::Bool, std::move(layout));
+  auto mask_buffer =
+      TensorBuffer::CreateManaged(env.Get(), kLiteRtTensorBufferTypeHostMemory,
+                                  ranked_tensor_type, sizeof(bool) * 96);
+  ASSERT_TRUE(mask_buffer);
+
+  // Initialize the mask with the default bool value (false).
+  ASSERT_OK(InitializeAttentionMask(*mask_buffer, /*is_f16=*/false));
+
+  // Fill attention mask starting from timestep 2 for 3 steps.
+  // channel_size = 8
+  // i = 0: current_step = 2. Fills indices [0, 2] with true.
+  // i = 1: current_step = 3. Fills indices [8, 11] with true.
+  // i = 2: current_step = 4. Fills indices [16, 20] with true.
+  ASSERT_OK(FillAttentionMask(*mask_buffer, /*start_timestep=*/2, /*steps=*/3));
+
+  auto lock = litert::TensorBufferScopedLock::Create(
+      *mask_buffer, litert::TensorBuffer::LockMode::kRead);
+  ASSERT_TRUE(lock);
+  bool* mask_ptr = static_cast<bool*>(lock->second);
+
+  for (int b = 0; b < 4; ++b) {
+    for (int i = 0; i < 24; ++i) {
+      if ((i >= 0 && i <= 2) || (i >= 8 && i <= 11) || (i >= 16 && i <= 20)) {
+        EXPECT_TRUE(mask_ptr[b * 24 + i]) << " at index " << i;
+      } else {
+        EXPECT_FALSE(mask_ptr[b * 24 + i]) << " at index " << i;
+      }
     }
   }
 }

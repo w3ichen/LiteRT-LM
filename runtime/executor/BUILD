@@ -151,7 +151,7 @@ cc_test(
         "@litert//litert/cc:litert_element_type",
         "@litert//litert/cc:litert_environment",
         "@litert//litert/cc:litert_layout",
-        "@litert//litert/cc:litert_model",
+        "@litert//litert/cc:litert_ranked_tensor_type",
         "@litert//litert/cc:litert_tensor_buffer",
         "@litert//litert/test:matchers",
         "//runtime/components:model_resources",
@@ -281,12 +281,14 @@ cc_test(
         ":llm_litert_compiled_model_executor",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/cleanup",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@litert//litert/test:matchers",
         "//runtime/components:model_resources",
         "//runtime/components:model_resources_task",
+        "//runtime/components:tokenizer",
         "//runtime/components/constrained_decoding:constrained_decoder",
         "//runtime/components/constrained_decoding:fake_constraint",
         "//runtime/util:convert_tensor_buffer",
@@ -298,7 +300,11 @@ cc_test(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
+            "@litert//litert/cc:litert_element_type",
             "@litert//litert/cc:litert_environment",
+            "@litert//litert/cc:litert_layout",
+            "@litert//litert/cc:litert_macros",
+            "@litert//litert/cc:litert_model",
         ],
     }),
 )
@@ -427,12 +433,24 @@ cc_library(
 
 cc_library(
     name = "llm_executor_processed_tokens",
+    srcs = ["llm_executor_processed_tokens.cc"],
     hdrs = ["llm_executor_processed_tokens.h"],
     deps = [
         "@com_google_absl//absl/log:absl_check",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "llm_executor_processed_tokens_test",
+    srcs = ["llm_executor_processed_tokens_test.cc"],
+    deps = [
+        ":llm_executor_processed_tokens",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/status",
+        "//runtime/util:test_utils",
     ],
 )
 

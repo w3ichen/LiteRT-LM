@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <filesystem>  // NOLINT: Required for path manipulation.
 #include <fstream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
@@ -26,16 +27,22 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "absl/cleanup/cleanup.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "absl/types/span.h"  // from @com_google_absl
+#include "litert/cc/litert_element_type.h"  // from @litert
 #include "litert/cc/litert_environment.h"  // from @litert
+#include "litert/cc/litert_layout.h"  // from @litert
+#include "litert/cc/litert_macros.h"  // from @litert
+#include "litert/cc/litert_model.h"  // from @litert
 #include "litert/test/matchers.h"  // from @litert
 #include "runtime/components/constrained_decoding/constrained_decoder.h"
 #include "runtime/components/constrained_decoding/fake_constraint.h"
 #include "runtime/components/model_resources.h"
 #include "runtime/components/model_resources_task.h"
+#include "runtime/components/tokenizer.h"
 #include "runtime/executor/executor_settings_base.h"
 #include "runtime/executor/llm_executor_io_types.h"
 #include "runtime/executor/llm_executor_settings.h"
@@ -381,6 +388,346 @@ TEST(LlmLiteRTCompiledModelExecutorTest,
                                                          env, *model_resources);
   ASSERT_OK(executor);
   ASSERT_NE(*executor, nullptr);
+}
+
+// Decode batch size and vocab size of magic_test_decode_batch.tflite.
+constexpr int kMaxDecodeBatchSize = 11;
+constexpr int kVocabSize = 16000;
+
+class TfLiteModelResources : public ModelResources {
+ public:
+  explicit TfLiteModelResources(const ModelAssets& model_assets) {
+    LITERT_ASSIGN_OR_ABORT(auto path, model_assets.GetPath());
+    LITERT_ASSIGN_OR_ABORT(model_, Model::CreateFromFile(std::string(path)));
+  }
+
+  // ModelResources implementation:
+  absl::StatusOr<const Model*> GetTFLiteModel(ModelType model_type) override {
+    if (model_type == ModelType::kTfLitePrefillDecode) {
+      return &model_;
+    }
+    return absl::UnimplementedError("Unsupported model type");
+  }
+
+  absl::StatusOr<absl::string_view> GetTFLiteModelBuffer(
+      ModelType model_type) override {
+    return absl::UnimplementedError("GetTFLiteModelBuffer not implemented.");
+  }
+
+  absl::StatusOr<Tokenizer*> GetTokenizer() override {
+    return absl::UnimplementedError("GetTokenizer not implemented.");
+  }
+
+  absl::StatusOr<const proto::LlmMetadata*> GetLlmMetadata() override {
+    return absl::UnimplementedError("GetLlmMetadata not implemented.");
+  }
+
+ private:
+  Model model_;
+};
+
+TEST(LlmLiteRTCompiledModelExecutorTest, MultipleOutput_Decode) {
+  const std::filesystem::path model_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/magic_test_decode_batch.tflite";
+  auto model_assets = ModelAssets::Create(model_path.string());
+  EXPECT_OK(model_assets);
+  auto executor_settings = LlmExecutorSettings::CreateDefault(*model_assets);
+  EXPECT_OK(executor_settings);
+  auto env = Environment::Create(std::vector<Environment::Option>());
+  EXPECT_TRUE(env);
+  TfLiteModelResources model_resources(*model_assets);
+  auto executor = LlmLiteRtCompiledModelExecutor::Create(
+      std::move(*executor_settings), *env, model_resources);
+  EXPECT_OK(executor);
+  EXPECT_TRUE(*executor);
+  auto step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 0);
+
+  // Prefill 5 tokens.
+  ExecutorInputs inputs;
+  const std::vector<int> input_tokens = {1, 2, 3, 4, 5};
+  auto input_tokens_buffer =
+      CopyToTensorBuffer<int>(absl::MakeSpan(input_tokens), {1, 5});
+  EXPECT_TRUE(input_tokens_buffer);
+  inputs.SetTextData(ExecutorTextData(std::move(*input_tokens_buffer)));
+  EXPECT_OK((*executor)->Prefill(inputs));
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 5);
+  auto step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4);
+  EXPECT_EQ(step_and_token.token.size(), 1);
+  EXPECT_EQ(step_and_token.token[0]->id(), 5);
+
+  // Decode 20 tokens.
+  constexpr int kDecodeSteps = 20;
+  auto output_tokens = CreateTensorBuffer<int>({kMaxDecodeBatchSize});
+  EXPECT_TRUE(output_tokens);
+  for (int i = 0; i < kDecodeSteps; ++i) {
+    EXPECT_OK((*executor)->Decode(*output_tokens));
+    auto output_span = ReferTensorBufferAsSpan<int>(*output_tokens);
+    EXPECT_TRUE(output_span);
+    EXPECT_EQ(output_span->size(), kMaxDecodeBatchSize);
+    // All tokens should be the same since sampling is strict.
+    for (int j = 1; j < kMaxDecodeBatchSize; ++j) {
+      EXPECT_EQ(output_span->at(0), output_span->at(j));
+    }
+  }
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 5 + kDecodeSteps);
+  step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4 + kDecodeSteps);
+  EXPECT_EQ(step_and_token.token.size(), kMaxDecodeBatchSize);
+  // All tokens should be the same since sampling is strict.
+  for (int i = 1; i < kMaxDecodeBatchSize; ++i) {
+    EXPECT_EQ(step_and_token.token[0]->id(), step_and_token.token[i]->id());
+  }
+
+  // Prefill once again, and see the token candidate is reduced one.
+  ExecutorInputs inputs_next;
+  input_tokens_buffer =
+      CopyToTensorBuffer<int>(absl::MakeSpan(input_tokens.data(), 1), {1, 1});
+  EXPECT_TRUE(input_tokens_buffer);
+  inputs_next.SetTextData(ExecutorTextData(std::move(*input_tokens_buffer)));
+  EXPECT_OK((*executor)->Prefill(inputs_next));
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 5 + kDecodeSteps + 1);
+  step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4 + kDecodeSteps + 1);
+  EXPECT_EQ(step_and_token.token.size(), 1);
+}
+
+TEST(LlmLiteRTCompiledModelExecutorTest,
+     MultipleOutput_DecodeLogits_EmptyInputs) {
+  const std::filesystem::path model_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/magic_test_decode_batch.tflite";
+  auto model_assets = ModelAssets::Create(model_path.string());
+  EXPECT_OK(model_assets);
+  auto executor_settings = LlmExecutorSettings::CreateDefault(*model_assets);
+  EXPECT_OK(executor_settings);
+  auto env = Environment::Create(std::vector<Environment::Option>());
+  EXPECT_TRUE(env);
+  TfLiteModelResources model_resources(*model_assets);
+  auto executor = LlmLiteRtCompiledModelExecutor::Create(
+      std::move(*executor_settings), *env, model_resources);
+  EXPECT_OK(executor);
+  EXPECT_TRUE(*executor);
+  auto step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 0);
+
+  // Prefill 5 tokens.
+  ExecutorInputs inputs;
+  const std::vector<int> input_tokens = {1, 2, 3, 4, 5};
+  auto input_tokens_buffer =
+      CopyToTensorBuffer<int>(absl::MakeSpan(input_tokens), {1, 5});
+  inputs.SetTextData(ExecutorTextData(std::move(*input_tokens_buffer)));
+  EXPECT_OK((*executor)->Prefill(inputs));
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 5);
+  auto step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4);
+  EXPECT_EQ(step_and_token.token.size(), 1);
+  EXPECT_EQ(step_and_token.token[0]->id(), 5);
+
+  // Decode 20 tokens.
+  constexpr int kDecodeSteps = 20;
+  ExecutorInputs decode_inputs;
+  for (int i = 0; i < kDecodeSteps; ++i) {
+    auto logits = (*executor)->DecodeLogits(decode_inputs);
+    EXPECT_OK(logits);
+    auto logits_type = logits->TensorType();
+    EXPECT_TRUE(logits_type);
+    EXPECT_EQ(logits_type->ElementType(), ElementType::Float32);
+    EXPECT_EQ(logits_type->Layout().Dimensions(),
+              Dimensions({kMaxDecodeBatchSize, 1, kVocabSize}));
+    auto logits_span = ReferTensorBufferAsSpan<float>(*logits);
+    EXPECT_TRUE(logits_span);
+    EXPECT_EQ(logits_span->size(), kMaxDecodeBatchSize * kVocabSize);
+    // Check the first logit of the first candidate vs the first logit of the
+    // last candidate. They are the same only for first decode step.
+    if (i == 0) {
+      EXPECT_EQ(logits_span->at(0),
+                logits_span->at((kMaxDecodeBatchSize - 1) * kVocabSize));
+    } else if (logits_span->at(0) != -std::numeric_limits<float>::infinity() &&
+               logits_span->at(0) != std::numeric_limits<float>::infinity()) {
+      EXPECT_NE(logits_span->at(0),
+                logits_span->at((kMaxDecodeBatchSize - 1) * kVocabSize));
+    }
+
+    // Prepare for next decode.
+    std::vector<int> decode_input_tokens{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    input_tokens_buffer = CopyToTensorBuffer<int>(
+        absl::MakeSpan(decode_input_tokens), {kMaxDecodeBatchSize, 1});
+    EXPECT_TRUE(input_tokens_buffer);
+    decode_inputs.SetTextData(
+        ExecutorTextData(std::move(*input_tokens_buffer)));
+  }
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  // First pending tokens were processed.
+  EXPECT_EQ(*step, 5 + kDecodeSteps - 1);
+  step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4 + kDecodeSteps);
+  // No pending input token left with DecodeLogits.
+  EXPECT_TRUE(step_and_token.token.empty());
+
+  // Prefill once again, and see the token candidate is reduced one.
+  ExecutorInputs inputs_next;
+  input_tokens_buffer =
+      CopyToTensorBuffer<int>(absl::MakeSpan(input_tokens.data(), 1), {1, 1});
+  inputs_next.SetTextData(ExecutorTextData(std::move(*input_tokens_buffer)));
+  EXPECT_OK((*executor)->Prefill(inputs_next));
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 5 + kDecodeSteps);
+  step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4 + kDecodeSteps);
+  // The prefilled token is added as pending input token.
+  EXPECT_EQ(step_and_token.token.size(), 1);
+}
+
+TEST(LlmLiteRTCompiledModelExecutorTest,
+     MultipleOutput_DecodeLogits_ValidInputs) {
+  const std::filesystem::path model_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/magic_test_decode_batch.tflite";
+  auto model_assets = ModelAssets::Create(model_path.string());
+  EXPECT_OK(model_assets);
+  auto executor_settings = LlmExecutorSettings::CreateDefault(*model_assets);
+  EXPECT_OK(executor_settings);
+  auto env = Environment::Create(std::vector<Environment::Option>());
+  EXPECT_TRUE(env);
+  TfLiteModelResources model_resources(*model_assets);
+  auto executor = LlmLiteRtCompiledModelExecutor::Create(
+      std::move(*executor_settings), *env, model_resources);
+  EXPECT_OK(executor);
+  EXPECT_TRUE(*executor);
+  auto step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 0);
+
+  // Prefill 5 tokens.
+  ExecutorInputs inputs;
+  const std::vector<int> input_tokens = {1, 2, 3, 4, 5};
+  auto input_tokens_buffer =
+      CopyToTensorBuffer<int>(absl::MakeSpan(input_tokens), {1, 5});
+  inputs.SetTextData(ExecutorTextData(std::move(*input_tokens_buffer)));
+  EXPECT_OK((*executor)->Prefill(inputs));
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 5);
+  auto step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4);
+  EXPECT_EQ(step_and_token.token.size(), 1);
+  EXPECT_EQ(step_and_token.token[0]->id(), 5);
+
+  // Decode 20 tokens.
+  constexpr int kDecodeSteps = 20;
+  ExecutorInputs decode_inputs;
+  const std::vector<int> decode_input_tokens{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+  input_tokens_buffer = CopyToTensorBuffer<int>(
+      absl::MakeSpan(decode_input_tokens), {kMaxDecodeBatchSize, 1});
+  EXPECT_TRUE(input_tokens_buffer);
+  decode_inputs.SetTextData(ExecutorTextData(std::move(*input_tokens_buffer)));
+  for (int i = 0; i < kDecodeSteps; ++i) {
+    auto logits = (*executor)->DecodeLogits(decode_inputs);
+    EXPECT_OK(logits);
+    auto logits_type = logits->TensorType();
+    EXPECT_TRUE(logits_type);
+    EXPECT_EQ(logits_type->ElementType(), ElementType::Float32);
+    EXPECT_EQ(logits_type->Layout().Dimensions(),
+              Dimensions({kMaxDecodeBatchSize, 1, kVocabSize}));
+    auto logits_span = ReferTensorBufferAsSpan<float>(*logits);
+    EXPECT_TRUE(logits_span);
+    EXPECT_EQ(logits_span->size(), kMaxDecodeBatchSize * kVocabSize);
+    // Check the first logit of the first candidate vs the first logit of the
+    // last candidate. They are different for all decode steps.
+    if (logits_span->at(0) != -std::numeric_limits<float>::infinity() &&
+        logits_span->at(0) != std::numeric_limits<float>::infinity()) {
+      EXPECT_NE(logits_span->at(0),
+                logits_span->at((kMaxDecodeBatchSize - 1) * kVocabSize));
+    }
+  }
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  // First pending tokens were ignored.
+  EXPECT_EQ(*step, 5 + kDecodeSteps - 1);
+  step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4 + kDecodeSteps);
+  // No pending input token left with DecodeLogits.
+  EXPECT_TRUE(step_and_token.token.empty());
+
+  // Prefill once again, and see the token candidate is reduced one.
+  ExecutorInputs inputs_next;
+  input_tokens_buffer =
+      CopyToTensorBuffer<int>(absl::MakeSpan(input_tokens.data(), 1), {1, 1});
+  inputs_next.SetTextData(ExecutorTextData(std::move(*input_tokens_buffer)));
+  EXPECT_OK((*executor)->Prefill(inputs_next));
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 5 + kDecodeSteps);
+  step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4 + kDecodeSteps);
+  // The prefilled token is added as pending input token.
+  EXPECT_EQ(step_and_token.token.size(), 1);
+}
+
+TEST(LlmLiteRTCompiledModelExecutorTest, MultipleOutput_BatchSizeMismatch) {
+  const std::filesystem::path model_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/magic_test_decode_batch.tflite";
+  auto model_assets = ModelAssets::Create(model_path.string());
+  EXPECT_OK(model_assets);
+  auto executor_settings = LlmExecutorSettings::CreateDefault(*model_assets);
+  EXPECT_OK(executor_settings);
+  auto env = Environment::Create(std::vector<Environment::Option>());
+  EXPECT_TRUE(env);
+  TfLiteModelResources model_resources(*model_assets);
+  auto executor = LlmLiteRtCompiledModelExecutor::Create(
+      std::move(*executor_settings), *env, model_resources);
+  EXPECT_OK(executor);
+  EXPECT_TRUE(*executor);
+  auto step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 0);
+
+  // Prefill 5 tokens.
+  ExecutorInputs inputs;
+  const std::vector<int> input_tokens = {1, 2, 3, 4, 5};
+  auto input_tokens_buffer =
+      CopyToTensorBuffer<int>(absl::MakeSpan(input_tokens), {1, 5});
+  inputs.SetTextData(ExecutorTextData(std::move(*input_tokens_buffer)));
+  EXPECT_OK((*executor)->Prefill(inputs));
+  step = (*executor)->GetCurrentStep();
+  EXPECT_OK(step);
+  EXPECT_EQ(*step, 5);
+  auto step_and_token =
+      (*executor)->processed_tokens_for_testing().GetNextUnprocessedToken();
+  EXPECT_EQ(step_and_token.step, 4);
+  EXPECT_EQ(step_and_token.token.size(), 1);
+  EXPECT_EQ(step_and_token.token[0]->id(), 5);
+
+  // Decode 20 tokens.
+  auto output_tokens = CreateTensorBuffer<int>({5});
+  EXPECT_TRUE(output_tokens);
+  EXPECT_THAT((*executor)->Decode(*output_tokens),
+              testing::status::StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
 }  // namespace
