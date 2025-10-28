@@ -24,7 +24,6 @@
 #include "litert/cc/litert_model.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
 #include "runtime/util/convert_tensor_buffer.h"
-#include "runtime/util/litert_status_util.h"
 #include "runtime/util/status_macros.h"  //NOLINT
 
 namespace litert::lm {
@@ -55,7 +54,7 @@ absl::Status ConstrainedDecoder::UpdateConstraintState(
 
 absl::Status ConstrainedDecoder::MaskLogits(::litert::TensorBuffer& logits) {
   // Compute the allowed tokens bitmap for the current constraint state.
-  LITERT_ASSIGN_OR_RETURN_ABSL(auto logits_tensor_type, logits.TensorType());
+  LITERT_ASSIGN_OR_RETURN(auto logits_tensor_type, logits.TensorType());
   LITERT_ASSIGN_OR_RETURN(auto logits_span,
                           ReferTensorBufferAsSpan<float>(logits));
   return MaskLogits(logits_span, logits_tensor_type.Layout().Dimensions());

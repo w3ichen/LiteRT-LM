@@ -35,8 +35,8 @@
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "absl/time/clock.h"  // from @com_google_absl
 #include "absl/time/time.h"  // from @com_google_absl
+#include "litert/cc/litert_macros.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
-#include "runtime/util/litert_status_util.h"
 
 namespace litert::lm {
 
@@ -61,7 +61,7 @@ absl::StatusOr<InputText> InputText::CreateCopy() const {
   if (std::holds_alternative<std::string>(data_)) {
     return InputText(std::move(std::get<std::string>(data_)));
   } else if (std::holds_alternative<TensorBuffer>(data_)) {
-    LITERT_ASSIGN_OR_RETURN_ABSL(auto tensor_buffer_clone,
+    LITERT_ASSIGN_OR_RETURN(auto tensor_buffer_clone,
                                  std::get<TensorBuffer>(data_).Duplicate());
     return InputText(std::move(tensor_buffer_clone));
   }
@@ -90,7 +90,7 @@ absl::StatusOr<InputImage> InputImage::CreateCopy() const {
   if (std::holds_alternative<std::string>(data_)) {
     return InputImage(std::move(std::get<std::string>(data_)));
   } else if (std::holds_alternative<TensorBuffer>(data_)) {
-    LITERT_ASSIGN_OR_RETURN_ABSL(auto tensor_buffer_clone,
+    LITERT_ASSIGN_OR_RETURN(auto tensor_buffer_clone,
                                  std::get<TensorBuffer>(data_).Duplicate());
     return InputImage(std::move(tensor_buffer_clone));
   }
@@ -119,7 +119,7 @@ absl::StatusOr<InputAudio> InputAudio::CreateCopy() const {
   if (std::holds_alternative<std::string>(data_)) {
     return InputAudio(std::move(std::get<std::string>(data_)));
   } else if (std::holds_alternative<TensorBuffer>(data_)) {
-    LITERT_ASSIGN_OR_RETURN_ABSL(auto tensor_buffer_clone,
+    LITERT_ASSIGN_OR_RETURN(auto tensor_buffer_clone,
                                  std::get<TensorBuffer>(data_).Duplicate());
     return InputAudio(std::move(tensor_buffer_clone));
   }

@@ -31,7 +31,6 @@
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
 #include "runtime/components/constrained_decoding/constraint.h"
 #include "runtime/proto/engine.pb.h"
-#include "runtime/util/litert_status_util.h"
 
 namespace litert::lm {
 

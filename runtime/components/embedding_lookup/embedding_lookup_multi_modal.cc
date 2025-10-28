@@ -31,7 +31,6 @@
 #include "litert/cc/litert_macros.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
 #include "runtime/util/convert_tensor_buffer.h"
-#include "runtime/util/litert_status_util.h"
 #include "runtime/util/status_macros.h"  //NOLINT
 
 namespace litert::lm {
@@ -177,7 +176,7 @@ absl::Status EmbeddingLookupMultiModal::Initialize(
         "Cannot initialize embedding lookup with an embedding buffer that is "
         "null.");
   }
-  LITERT_ASSIGN_OR_RETURN_ABSL(
+  LITERT_ASSIGN_OR_RETURN(
       embedding_,
       ::litert::lm::ReferTensorBufferAsSpan<float>(*embedding_buffer));
   special_token_ = special_token;

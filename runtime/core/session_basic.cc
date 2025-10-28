@@ -33,6 +33,7 @@
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "litert/cc/litert_layout.h"  // from @litert
+#include "litert/cc/litert_macros.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
 #include "runtime/components/sampler.h"
 #include "runtime/components/sampler_factory.h"
@@ -50,7 +51,6 @@
 #include "runtime/framework/threadpool.h"
 #include "runtime/proto/sampler_params.pb.h"
 #include "runtime/util/convert_tensor_buffer.h"
-#include "runtime/util/litert_status_util.h"
 #include "runtime/util/status_macros.h"  // IWYU pragma: keep
 #include "runtime/util/tensor_buffer_util.h"
 
@@ -73,7 +73,7 @@ absl::StatusOr<T> CombineExecutorDataImpl(std::vector<T>& executor_data) {
   int num_executor_data = executor_data.size();
   ASSIGN_OR_RETURN(const auto* first_tensor,
                    executor_data[0].GetEmbeddingsPtr());
-  LITERT_ASSIGN_OR_RETURN_ABSL(auto first_tensor_type,
+  LITERT_ASSIGN_OR_RETURN(auto first_tensor_type,
                                first_tensor->TensorType());
   auto first_tensor_dims = TensorBufferDims(*first_tensor);
   int total_token_num = 0;
@@ -89,7 +89,7 @@ absl::StatusOr<T> CombineExecutorDataImpl(std::vector<T>& executor_data) {
     }
     combined_token_num.push_back(dims[dims.size() - 2]);
     total_token_num += dims[dims.size() - 2];
-    LITERT_ASSIGN_OR_RETURN_ABSL(size_t packed_size,
+    LITERT_ASSIGN_OR_RETURN(size_t packed_size,
                                  embeddings_ptr->PackedSize());
     total_packed_size += packed_size;
   }
@@ -108,11 +108,11 @@ absl::StatusOr<T> CombineExecutorDataImpl(std::vector<T>& executor_data) {
   ::litert::RankedTensorType combined_tensor_type(
       first_tensor_type.ElementType(), std::move(combined_layout));
 
-  LITERT_ASSIGN_OR_RETURN_ABSL(
+  LITERT_ASSIGN_OR_RETURN(
       auto combined_tensor_buffer,
       TensorBuffer::CreateManaged(kLiteRtTensorBufferTypeHostMemory,
                                   combined_tensor_type, total_packed_size));
-  LITERT_ASSIGN_OR_RETURN_ABSL(
+  LITERT_ASSIGN_OR_RETURN(
       auto combined_embeddings_lock_and_addr,
       ::litert::TensorBufferScopedLock::Create(combined_tensor_buffer,
                                                TensorBuffer::LockMode::kWrite));
@@ -121,9 +121,9 @@ absl::StatusOr<T> CombineExecutorDataImpl(std::vector<T>& executor_data) {
   for (int i = 0; i < num_executor_data; ++i) {
     ASSIGN_OR_RETURN(auto embeddings_ptr,
                      executor_data[i].GetMutableEmbeddingsPtr());
-    LITERT_ASSIGN_OR_RETURN_ABSL(auto embeddings_size,
+    LITERT_ASSIGN_OR_RETURN(auto embeddings_size,
                                  embeddings_ptr->PackedSize());
-    LITERT_ASSIGN_OR_RETURN_ABSL(
+    LITERT_ASSIGN_OR_RETURN(
         auto embeddings_lock_and_addr,
         ::litert::TensorBufferScopedLock::Create(
             *embeddings_ptr, TensorBuffer::LockMode::kRead));
@@ -308,7 +308,7 @@ absl::StatusOr<ExecutorInputs> SessionBasic::ProcessAndCombineContents(
         return absl::InvalidArgumentError(
             "Token IDs is null in preprocessed_contents.");
       }
-      LITERT_ASSIGN_OR_RETURN_ABSL(auto ids_buffer_span,
+      LITERT_ASSIGN_OR_RETURN(auto ids_buffer_span,
                                    ReferTensorBufferAsSpan<int>(*token_ids));
       combined_token_ids.insert(combined_token_ids.end(),
                                 ids_buffer_span.begin(), ids_buffer_span.end());

@@ -11,9 +11,9 @@
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "litert/cc/litert_compiled_model.h"  // from @litert
+#include "litert/cc/litert_macros.h"  // from @litert
 #include "litert/cc/litert_model.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
-#include "runtime/util/litert_status_util.h"
 #include "runtime/util/lora_data.h"
 #include "runtime/util/lora_util.h"
 #include "runtime/util/status_macros.h"
@@ -40,7 +40,7 @@ absl::StatusOr<std::unique_ptr<LoRA>> LoRA::Create(
 
 absl::Status LoRA::Init() {
   // Get the input names from the default signature.
-  LITERT_ASSIGN_OR_RETURN_ABSL(
+  LITERT_ASSIGN_OR_RETURN(
       auto input_names, model_.GetSignatureInputNames(kDecodeSignatureRunner));
 
   for (const auto& input_name : input_names) {
@@ -48,14 +48,14 @@ absl::Status LoRA::Init() {
       continue;
     }
     // Create the input buffer for the LoRA tensor.
-    LITERT_ASSIGN_OR_RETURN_ABSL(
+    LITERT_ASSIGN_OR_RETURN(
         litert::TensorBuffer tensor_buffer,
         compiled_model_.CreateInputBuffer(kDecodeSignatureRunner, input_name));
 
-    LITERT_ASSIGN_OR_RETURN_ABSL(
+    LITERT_ASSIGN_OR_RETURN(
         auto lock_and_addr, litert::TensorBufferScopedLock::Create(
                                 tensor_buffer, TensorBuffer::LockMode::kWrite));
-    LITERT_ASSIGN_OR_RETURN_ABSL(auto tensor_buffer_size,
+    LITERT_ASSIGN_OR_RETURN(auto tensor_buffer_size,
                                  tensor_buffer.PackedSize());
 
     if (lora_data_->HasTensor(input_name)) {
@@ -85,7 +85,7 @@ absl::StatusOr<litert::TensorBuffer> LoRA::GetLoRABuffer(
   if (it == lora_buffers_.end()) {
     return absl::NotFoundError("LoRA tensor not found.");
   }
-  LITERT_ASSIGN_OR_RETURN_ABSL(auto duplicated_buffer, it->second.Duplicate());
+  LITERT_ASSIGN_OR_RETURN(auto duplicated_buffer, it->second.Duplicate());
   return duplicated_buffer;
 }
 
@@ -93,7 +93,7 @@ absl::StatusOr<absl::flat_hash_map<absl::string_view, litert::TensorBuffer>>
 LoRA::GetLoRABuffers() const {
   absl::flat_hash_map<absl::string_view, litert::TensorBuffer> buffers;
   for (const auto& [name, buffer] : lora_buffers_) {
-    LITERT_ASSIGN_OR_RETURN_ABSL(buffers[name], buffer.Duplicate());
+    LITERT_ASSIGN_OR_RETURN(buffers[name], buffer.Duplicate());
   }
   return buffers;
 }

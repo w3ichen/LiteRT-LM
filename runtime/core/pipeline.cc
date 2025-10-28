@@ -49,7 +49,6 @@
 #include "runtime/executor/llm_litert_compiled_model_executor.h"
 #include "runtime/proto/sampler_params.pb.h"
 #include "runtime/util/convert_tensor_buffer.h"
-#include "runtime/util/litert_status_util.h"
 #include "runtime/util/status_macros.h"  //NOLINT
 
 namespace litert::lm {
@@ -143,7 +142,7 @@ class DecodeOneStep {
 
     // Regardless of BPE, we always process the next tokens to detect stop
     // tokens.
-    LITERT_ASSIGN_OR_RETURN_ABSL(
+    LITERT_ASSIGN_OR_RETURN(
         auto next_tokens_span,
         ReferTensorBufferAsSpan<int>(*next_tokens_buffer));
     RETURN_IF_ERROR(stop_token_detector_.ProcessTokens(next_tokens_span));
@@ -179,7 +178,7 @@ class DecodeOneStep {
     }
 
     if (sampler_.has_value()) {
-      LITERT_ASSIGN_OR_RETURN_ABSL(
+      LITERT_ASSIGN_OR_RETURN(
           scores_span_, ReferTensorBufferAsSpan<float>(scores_tensor_));
     }
 
@@ -436,7 +435,7 @@ absl::StatusOr<Responses> DecodeLoop(
     // For external sampling, the sampled tokens are provided by the sampler. We
     // must run one prefill to add the stop token as pending token in the LLM
     // Executor when stop condition is met.
-    LITERT_ASSIGN_OR_RETURN_ABSL(auto duplicated_decoded_ids,
+    LITERT_ASSIGN_OR_RETURN(auto duplicated_decoded_ids,
                                  decoded_ids.value()->Duplicate());
     ExecutorInputs inputs;
     inputs.SetTextData(ExecutorTextData(std::move(duplicated_decoded_ids)));
@@ -543,7 +542,7 @@ absl::StatusOr<int> Prefill(LlmExecutor& executor, ExecutorInputs& inputs,
   const int max_num_tokens = TryGetMaxNumTokens(executor);
   ASSIGN_OR_RETURN(auto text_data, inputs.GetTextDataPtr());
   RET_CHECK(text_data != nullptr) << "text_data must not be null.";
-  LITERT_ASSIGN_OR_RETURN_ABSL(auto token_id_tensor_type,
+  LITERT_ASSIGN_OR_RETURN(auto token_id_tensor_type,
                                text_data->GetTokenIds().TensorType());
   auto num_tokens = token_id_tensor_type.Layout().Dimensions().back();
   if (num_tokens >= max_num_tokens) {
@@ -552,7 +551,7 @@ absl::StatusOr<int> Prefill(LlmExecutor& executor, ExecutorInputs& inputs,
         "allowed: ",
         num_tokens, " >= ", max_num_tokens));
   }
-  LITERT_ASSIGN_OR_RETURN_ABSL(
+  LITERT_ASSIGN_OR_RETURN(
       auto ids_buffer_span,
       ReferTensorBufferAsSpan<int>(text_data->GetTokenIds()));
   if (ids_buffer_span.empty()) {

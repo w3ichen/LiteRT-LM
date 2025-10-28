@@ -29,12 +29,12 @@
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "litert/cc/internal/litert_shared_library.h"  // from @litert
+#include "litert/cc/litert_macros.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
 #include "runtime/components/sampler.h"
 #include "runtime/components/top_p_cpu_sampler.h"
 #include "runtime/executor/executor_settings_base.h"
 #include "runtime/proto/sampler_params.pb.h"
-#include "runtime/util/litert_status_util.h"
 #include "runtime/util/status_macros.h"  // IWYU pragma: keep
 
 namespace litert::lm {
@@ -149,17 +149,17 @@ class TopKCApiSampler : public Sampler {
       maybe_lib = SharedLibrary::Load(RtldFlags::kDefault);
     }
     SharedLibrary lib(std::move(maybe_lib.Value()));
-    LITERT_ASSIGN_OR_RETURN_ABSL(
+    LITERT_ASSIGN_OR_RETURN(
         auto sampler_create_func,
         lib.LookupSymbol<LiteRtTopKSampler_Create>(create_func_name));
     RET_CHECK_NE(sampler_create_func, nullptr)
         << "Failed to load " << create_func_name;
-    LITERT_ASSIGN_OR_RETURN_ABSL(
+    LITERT_ASSIGN_OR_RETURN(
         auto sampler_destroy_func,
         lib.LookupSymbol<LiteRtTopKSampler_Destroy>(destroy_func_name));
     RET_CHECK_NE(sampler_destroy_func, nullptr)
         << "Failed to load " << destroy_func_name;
-    LITERT_ASSIGN_OR_RETURN_ABSL(
+    LITERT_ASSIGN_OR_RETURN(
         auto sampler_sample_func,
         lib.LookupSymbol<LiteRtTopKSampler_SampleToIdAndScoreBuffer>(
             sample_func_name));
