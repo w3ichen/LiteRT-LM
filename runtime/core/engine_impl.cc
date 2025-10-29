@@ -60,7 +60,6 @@
 #endif  // !defined(LITERT_DISABLE_NPU)
 
 namespace litert::lm {
-
 namespace {
 
 // Gets the singleton Environment, initializing it on the first call
@@ -69,6 +68,9 @@ namespace {
 // LiteRT environment. See b/454383477 for more details.
 absl::StatusOr<Environment&> GetEnvironment(
     const EngineSettings& engine_settings, ModelResources& model_resources) {
+  // Helper must be available until LlmLiteRtCompiledModelExecutor::Create() is
+  // called. Since env is used multiple times, it should also be static.
+  static absl::NoDestructor<MagicNumberConfigsHelper> helper;
   static absl::NoDestructor<absl::StatusOr<Environment>> kEnvironment(
       [&]() -> absl::StatusOr<Environment> {
         std::vector<Environment::Option> env_options;
@@ -77,13 +79,12 @@ absl::StatusOr<Environment&> GetEnvironment(
 
         if ((main_executor_settings.GetBackend() == Backend::CPU) ||
             (main_executor_settings.GetBackend() == Backend::GPU)) {
-          MagicNumberConfigsHelper helper;
           if (!main_executor_settings
                    .GetAdvancedSettings() ||  // Default is true.
               main_executor_settings.GetAdvancedSettings()
                   ->configure_magic_numbers) {
-            env_options = helper.GetLiteRtEnvOptions(model_resources,
-                                                     main_executor_settings);
+            env_options = helper->GetLiteRtEnvOptions(model_resources,
+                                                      main_executor_settings);
           }
         } else {
 #if defined(LITERT_DISABLE_NPU)
