@@ -196,6 +196,7 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_macros",
+        "@litert//litert/cc:litert_tensor_buffer_types",
         "//runtime/components:sampler",
         "//runtime/components:sampler_factory",
         "//runtime/components:stop_token_detector",

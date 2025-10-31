@@ -31,6 +31,7 @@
 #include "litert/cc/litert_expected.h"  // from @litert
 #include "litert/cc/litert_layout.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
+#include "litert/cc/litert_tensor_buffer_types.h"  // from @litert
 #include "litert/test/matchers.h"  // from @litert
 #include "runtime/components/constrained_decoding/constraint_provider.h"
 #include "runtime/components/constrained_decoding/fst_constraint_provider.h"
@@ -80,7 +81,7 @@ Expected<TensorBuffer> CreateTokenIdsTensorBuffer(const Environment& env,
       std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<int>()) *
       sizeof(data[0]);
   auto tokens_id_tensor_buffer =
-      TensorBuffer::CreateManaged(env.Get(), kLiteRtTensorBufferTypeHostMemory,
+      TensorBuffer::CreateManaged(env, ::litert::TensorBufferType::kHostMemory,
                                   tokens_id_tensor_type, buffer_size);
   if (!tokens_id_tensor_buffer.HasValue()) {
     return tokens_id_tensor_buffer;

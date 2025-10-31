@@ -87,6 +87,7 @@ cc_test(
         "@litert//litert/cc:litert_layout",
         "@litert//litert/cc:litert_model",
         "@litert//litert/cc:litert_tensor_buffer",
+        "@litert//litert/cc:litert_tensor_buffer_types",
         "@litert//litert/test:matchers",
         "//runtime/components/constrained_decoding:fake_constraint",
         "//runtime/util:convert_tensor_buffer",
