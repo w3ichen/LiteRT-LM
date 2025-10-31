@@ -35,11 +35,10 @@ using DataProcessorConfig =
 // DataProcessorArguments is a registry of all the model-specific data processor
 // arguments. The DataProcessorArguments is used to pass arguments of single
 // turn to the ModelDataProcessor during the conversation.
-using DataProcessorArguments =
-    std::variant<std::monostate, GenericDataProcessorArguments,
-                 Gemma3DataProcessorArguments,
-                 Qwen3DataProcessorArguments
-                 >;
+using DataProcessorArguments = std::variant<
+    std::monostate, GenericDataProcessorArguments, Gemma3DataProcessorArguments,
+    Qwen3DataProcessorArguments
+    >;
 
 }  // namespace litert::lm
 

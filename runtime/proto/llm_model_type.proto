@@ -64,7 +64,6 @@ message Gemma3 {
   // The width of the image tensor that image preprocessor should resize to.
   int32 image_tensor_width = 4;
 }
-
 // Qwen3 model.
 message Qwen3 {
   // Options for tool calling.
