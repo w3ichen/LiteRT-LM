@@ -136,6 +136,7 @@ absl::Status EngineSettings::MaybeUpdateAndValidate(
     Tokenizer& tokenizer,
     const proto::LlmMetadata* absl_nullable metadata_from_file,
     absl::string_view input_prompt_as_hint,
+    const std::optional<std::string>& text_backend_constraint,
     const std::optional<std::string>& vision_backend_constraint,
     const std::optional<std::string>& audio_backend_constraint) {
   proto::LlmMetadata& metadata = GetMutableLlmMetadata();
@@ -239,8 +240,10 @@ absl::Status EngineSettings::MaybeUpdateAndValidate(
                                                    metadata.llm_model_type()));
   }
 
-  // If the vision executor settings is set, then check if the vision backend
-  // constraint is compatible.
+  // If the executor settings is set, then check if the input backend constraint
+  // is compatible with the executor settings.
+  RETURN_IF_ERROR(ValidateBackendConstraint<LlmExecutorSettings>(
+      main_executor_settings_, text_backend_constraint, "Main"));
   RETURN_IF_ERROR(ValidateBackendConstraint<LlmExecutorSettings>(
       vision_executor_settings_, vision_backend_constraint, "Vision"));
   RETURN_IF_ERROR(ValidateBackendConstraint<AudioExecutorSettings>(

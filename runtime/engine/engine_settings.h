@@ -83,6 +83,7 @@ class EngineSettings {
       Tokenizer& tokenizer,
       const proto::LlmMetadata* absl_nullable metadata_from_file,
       absl::string_view input_prompt_as_hint = "",
+      const std::optional<std::string>& text_backend_constraint = std::nullopt,
       const std::optional<std::string>& vision_backend_constraint =
           std::nullopt,
       const std::optional<std::string>& audio_backend_constraint =

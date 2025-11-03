@@ -229,6 +229,8 @@ absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
   RETURN_IF_ERROR(engine_settings.MaybeUpdateAndValidate(
       *tokenizer, llm_metadata, input_prompt_as_hint,
       model_resources->GetTFLiteModelBackendConstraint(
+          ModelType::kTfLitePrefillDecode),
+      model_resources->GetTFLiteModelBackendConstraint(
           ModelType::kTfLiteVisionEncoder),
       model_resources->GetTFLiteModelBackendConstraint(
           ModelType::kTfLiteAudioEncoderHw)));
