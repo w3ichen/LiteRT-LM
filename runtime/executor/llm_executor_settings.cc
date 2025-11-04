@@ -39,6 +39,8 @@ std::ostream& operator<<(std::ostream& os, const GpuArtisanConfig& config) {
   os << "supported_lora_ranks: " << config.supported_lora_ranks << "\n";
   os << "max_top_k: " << config.max_top_k << "\n";
   os << "enable_decode_logits: " << config.enable_decode_logits << "\n";
+  os << "enable_external_embeddings: " << config.enable_external_embeddings
+     << "\n";
   return os;
 }
 

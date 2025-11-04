@@ -65,6 +65,11 @@ struct GpuArtisanConfig {
   // AiCore uses decode logits, so this is enabled for AiCore.
   // LLM Engine defaults to disabling decode logits.
   bool enable_decode_logits = false;
+
+  // Enables external embeddings.
+  // AiCore uses external embeddings, so this is enabled for AiCore.
+  // LLM Engine defaults to disabling external embeddings.
+  bool enable_external_embeddings = false;
 };
 
 std::ostream& operator<<(std::ostream& os, const GpuArtisanConfig& config);
