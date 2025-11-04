@@ -132,9 +132,25 @@ absl::StatusOr<EngineSettings> CreateEngineSettings(
   if (settings.force_f32) {
     engine_settings.GetMutableMainExecutorSettings().SetActivationDataType(
         litert::lm::ActivationDataType::FLOAT32);
+    if (settings.vision_backend.has_value()) {
+      engine_settings.GetMutableVisionExecutorSettings()->SetActivationDataType(
+          litert::lm::ActivationDataType::FLOAT32);
+    }
+    if (settings.audio_backend.has_value()) {
+      engine_settings.GetMutableAudioExecutorSettings()->SetActivationDataType(
+          litert::lm::ActivationDataType::FLOAT32);
+    }
   }
   if (settings.disable_cache) {
     engine_settings.GetMutableMainExecutorSettings().SetCacheDir(":nocache");
+    if (settings.vision_backend.has_value()) {
+      engine_settings.GetMutableVisionExecutorSettings()->SetCacheDir(
+          ":nocache");
+    }
+    if (settings.audio_backend.has_value()) {
+      engine_settings.GetMutableAudioExecutorSettings()->SetCacheDir(
+          ":nocache");
+    }
   }
   if (backend == Backend::CPU && settings.num_cpu_threads > 0) {
     auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();

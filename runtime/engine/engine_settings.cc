@@ -328,6 +328,18 @@ std::ostream& operator<<(std::ostream& os, const EngineSettings& settings) {
   } else {
     os << "  BenchmarkParams: Not set" << std::endl;
   }
+  if (settings.GetVisionExecutorSettings().has_value()) {
+    os << "  VisionExecutorSettings: "
+       << settings.GetVisionExecutorSettings().value();
+  } else {
+    os << "  VisionExecutorSettings: Not set" << std::endl;
+  }
+  if (settings.GetAudioExecutorSettings().has_value()) {
+    os << "  AudioExecutorSettings: "
+       << settings.GetAudioExecutorSettings().value();
+  } else {
+    os << "  AudioExecutorSettings: Not set" << std::endl;
+  }
   return os;
 }
 

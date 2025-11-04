@@ -16,6 +16,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -29,7 +30,7 @@
 #if !defined(LITERT_DISABLE_NPU)
 #include "litert/c/options/litert_qualcomm_options.h"  // from @litert
 #endif  // !defined(LITERT_DISABLE_NPU)
-#include "litert/cc/litert_common.h"  // from @litert
+#include "litert/c/litert_common.h"  // from @litert
 #include "litert/cc/litert_compiled_model.h"  // from @litert
 #include "litert/cc/litert_environment.h"  // from @litert
 #include "litert/cc/litert_macros.h"  // from @litert
@@ -46,6 +47,7 @@
 #include "runtime/executor/llm_executor_io_types.h"
 #include "runtime/executor/vision_executor_settings.h"
 #include "runtime/util/convert_tensor_buffer.h"
+#include "runtime/util/file_util.h"
 #include "runtime/util/status_macros.h"  // NOLINT
 
 namespace litert::lm {
@@ -53,9 +55,10 @@ namespace litert::lm {
 absl::StatusOr<
     std::unique_ptr<VisionLiteRtCompiledModelExecutor::VisionEncoder>>
 VisionLiteRtCompiledModelExecutor::VisionEncoder::Create(
-    Environment& env, const Model* absl_nonnull model, Backend backend) {
-  auto handler =
-      std::unique_ptr<VisionEncoder>(new VisionEncoder(env, model, backend));
+    Environment& env, const Model* absl_nonnull model,
+    VisionExecutorSettings& vision_executor_settings) {
+  auto handler = std::unique_ptr<VisionEncoder>(
+      new VisionEncoder(env, model, vision_executor_settings));
   RETURN_IF_ERROR(handler->Initialize());
   return handler;
 }
@@ -63,6 +66,12 @@ VisionLiteRtCompiledModelExecutor::VisionEncoder::Create(
 absl::Status VisionLiteRtCompiledModelExecutor::VisionEncoder::Initialize() {
   // TODO(b/405424188): - Add support for NPU backends.
   LITERT_ASSIGN_OR_RETURN(auto options, Options::Create());
+  std::string weight_cache_path = vision_executor_settings_.GetCacheDir();
+  auto activation_data_type = ActivationDataType::FLOAT16;
+  if (vision_executor_settings_.GetActivationDataType().has_value()) {
+    activation_data_type =
+        vision_executor_settings_.GetActivationDataType().value();
+  }
   switch (backend_) {
     case Backend::CPU: {
       // TODO: b/403132820 - Add accelerator compilation options for XNNPACK.
@@ -84,10 +93,27 @@ absl::Status VisionLiteRtCompiledModelExecutor::VisionEncoder::Initialize() {
       LITERT_ASSIGN_OR_RETURN(GpuOptions gpu_compilation_options,
                               GpuOptions::Create());
       gpu_compilation_options.EnableConstantTensorSharing(true);
-
-      gpu_compilation_options.SetDelegatePrecision(
-          LiteRtDelegatePrecision::kLiteRtDelegatePrecisionFp16);
+      if (activation_data_type == ActivationDataType::FLOAT32) {
+        gpu_compilation_options.SetDelegatePrecision(
+            kLiteRtDelegatePrecisionFp32);
+      } else {
+        gpu_compilation_options.SetDelegatePrecision(
+            kLiteRtDelegatePrecisionFp16);
+      }
       gpu_compilation_options.SetPreferTextureWeights(true);
+
+      if (weight_cache_path != ":nocache") {
+        ASSIGN_OR_RETURN(auto model_path,
+                         vision_executor_settings_.GetModelAssets().GetPath());
+        if (weight_cache_path.empty()) {
+          weight_cache_path = Dirname(model_path);
+        }
+        gpu_compilation_options.SetSerializationDir(weight_cache_path.c_str());
+        absl::string_view model_name = Basename(model_path);
+        gpu_compilation_options.SetModelCacheKey(model_name.data());
+        gpu_compilation_options.SetSerializeProgramCache(true);
+        gpu_compilation_options.SetSerializeExternalTensors(true);
+      }
       options.AddOpaqueOptions(std::move(gpu_compilation_options));
       options.SetHardwareAccelerators(litert::HwAccelerators::kGpu);
       break;
@@ -168,7 +194,7 @@ absl::Status VisionLiteRtCompiledModelExecutor::VisionAdapter::Initialize() {
       gpu_compilation_options.EnableAllowSrcQuantizedFcConvOps(true);
 
       gpu_compilation_options.SetDelegatePrecision(
-          LiteRtDelegatePrecision::kLiteRtDelegatePrecisionFp16);
+          kLiteRtDelegatePrecisionFp16);
       gpu_compilation_options.SetPreferTextureWeights(true);
       options.AddOpaqueOptions(std::move(gpu_compilation_options));
       options.SetHardwareAccelerators(litert::HwAccelerators::kGpu);
@@ -208,10 +234,9 @@ litert::lm::VisionLiteRtCompiledModelExecutor::Create(
     return absl::InternalError("Failed to build LiteRt adapter model.");
   }
 
-  ASSIGN_OR_RETURN(
-      auto vision_encoder,
-      VisionEncoder::Create(env, vision_encoder_model,
-                            vision_executor_settings.GetEncoderBackend()));
+  ASSIGN_OR_RETURN(auto vision_encoder,
+                   VisionEncoder::Create(env, vision_encoder_model,
+                                         vision_executor_settings));
   ASSIGN_OR_RETURN(
       auto vision_adapter,
       VisionAdapter::Create(env, vision_adapter_model,

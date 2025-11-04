@@ -566,12 +566,14 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "//runtime/components:model_resources",
         "//runtime/util:convert_tensor_buffer",
+        "//runtime/util:file_util",
         "//runtime/util:litert_status_util",
     ] + select({
         "@litert//litert:litert_link_capi_so": [
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
+            "@litert//litert/c:litert_common",
             "@litert//litert/c/options:litert_qualcomm_options",
             "@litert//litert/cc:litert_common",
             "@litert//litert/cc:litert_compiled_model",
