@@ -328,10 +328,13 @@ cc_library(
     srcs = ["llm_litert_compiled_model_executor_factory.cc"],
     hdrs = ["llm_litert_compiled_model_executor_factory.h"],
     deps = [
+        ":executor_settings_base",
         ":litert_compiled_model_executor_utils",
         ":llm_executor",
         ":llm_executor_settings",
         ":llm_litert_compiled_model_executor",
+        ":llm_litert_npu_compiled_model_executor",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:string_view",

@@ -1384,9 +1384,7 @@ LlmLiteRtNpuCompiledModelExecutor::GetLatencyStats() const {
 }
 
 absl::Status LlmLiteRtNpuCompiledModelExecutor::Reset() {
-  if (is_benchmark_enabled_) {
-    PrintLatencyStats(GetLatencyStats());
-  }
+  PrintLatencyStats(GetLatencyStats());
   current_step_ = 0;
   RETURN_IF_ERROR(processed_tokens_.RollBackToStep(0));
   sampled_ids_.clear();
@@ -1398,7 +1396,7 @@ absl::Status LlmLiteRtNpuCompiledModelExecutor::Reset() {
 absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
 LlmLiteRtNpuCompiledModelExecutor::Create(
     const LlmExecutorSettings& executor_settings, ModelResources& resources,
-    Environment& env, bool is_benchmark_enabled) {
+    Environment& env) {
   ASSIGN_OR_RETURN(const litert::Model* llm_model,
                    resources.GetTFLiteModel(ModelType::kTfLitePrefillDecode));
 
@@ -1408,11 +1406,9 @@ LlmLiteRtNpuCompiledModelExecutor::Create(
                           HasPerLayerEmbedder(*llm_model));
   const bool IsGemma3n = has_per_layer_embeddings;
   if (IsGemma3n) {
-    return CreateForGemma3n(executor_settings, resources, env, llm_model,
-                            is_benchmark_enabled);
+    return CreateForGemma3n(executor_settings, resources, env, llm_model);
   } else {
-    return CreateForGemma3(executor_settings, resources, env, llm_model,
-                           is_benchmark_enabled);
+    return CreateForGemma3(executor_settings, resources, env, llm_model);
   }
 };
 
@@ -1431,8 +1427,7 @@ litert::Expected<litert::Options> CreateLiteRtOptions() {
 absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
 LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3n(
     const LlmExecutorSettings& executor_settings, ModelResources& resources,
-    litert::Environment& env, const litert::Model* transformer_model,
-    bool is_benchmark_enabled) {
+    litert::Environment& env, const litert::Model* transformer_model) {
   // If the model is fully AOT compiled for NPU, NPU accelerator is used
   // automatically.
   // Set up LiteRt options.
@@ -1569,15 +1564,14 @@ LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3n(
       std::move(llm_inference_context),
       std::move(cache_update_inference_context), std::move(prefill_runner_set),
       std::move(embedding_lookup_manager),
-      std::move(embedder_per_layer_context), is_benchmark_enabled));
+      std::move(embedder_per_layer_context)));
   return executor;
 }
 
 absl::StatusOr<std::unique_ptr<LlmLiteRtNpuCompiledModelExecutor>>
 LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3(
     const LlmExecutorSettings& executor_settings, ModelResources& resources,
-    litert::Environment& env, const litert::Model* transformer_model,
-    bool is_benchmark_enabled) {
+    litert::Environment& env, const litert::Model* transformer_model) {
   // If the model is fully AOT compiled for NPU, NPU accelerator is used
   // automatically.
   LITERT_ASSIGN_OR_RETURN(auto options, CreateLiteRtOptions());
@@ -1722,7 +1716,7 @@ LlmLiteRtNpuCompiledModelExecutor::CreateForGemma3(
       std::move(llm_inference_context),
       std::move(cache_update_inference_context), std::move(prefill_runner_set),
       std::move(maybe_embedding_lookup_manager),
-      /*embedder_per_layer_context=*/std::nullopt, is_benchmark_enabled));
+      /*embedder_per_layer_context=*/std::nullopt));
   return executor;
 }
 

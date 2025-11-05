@@ -13,6 +13,10 @@ namespace litert::lm {
 
 // Create an instance of LlmExecutor for LiteRT compiled models. Supports both
 // statically and dynamically shaped models.
+// Args:
+//   executor_settings: Settings for the executor.
+//   lrt_env: The LiteRT environment.
+//   resources: The model resources.
 absl::StatusOr<std::unique_ptr<LlmExecutor>>
 CreateLlmLiteRtCompiledModelExecutor(LlmExecutorSettings executor_settings,
                                      Environment& lrt_env,

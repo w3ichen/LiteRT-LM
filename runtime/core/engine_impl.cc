@@ -47,17 +47,12 @@
 #include "runtime/executor/llm_litert_compiled_model_executor_factory.h"
 #include "runtime/executor/magic_number_configs_helper.h"
 #include "runtime/executor/vision_executor.h"
-#include "runtime/executor/vision_executor_settings.h"
 #include "runtime/executor/vision_litert_compiled_model_executor.h"
 #include "runtime/framework/threadpool.h"
 #include "runtime/proto/llm_metadata.pb.h"
 #include "runtime/proto/sampler_params.pb.h"
 #include "runtime/util/file_format_util.h"
 #include "runtime/util/status_macros.h"  // NOLINT
-
-#if !defined(LITERT_DISABLE_NPU)
-#include "runtime/executor/llm_litert_npu_compiled_model_executor.h"
-#endif  // !defined(LITERT_DISABLE_NPU)
 
 namespace litert::lm {
 namespace {
@@ -238,27 +233,11 @@ absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
   std::unique_ptr<LlmExecutor> executor;
   ASSIGN_OR_RETURN(auto& env,
                    GetEnvironment(engine_settings, *model_resources));
-  if ((engine_settings.GetMainExecutorSettings().GetBackend() ==
-       Backend::CPU) ||
-      (engine_settings.GetMainExecutorSettings().GetBackend() ==
-       Backend::GPU)) {
-    const auto& main_executor_settings =
-        engine_settings.GetMainExecutorSettings();
-    ASSIGN_OR_RETURN(
-        executor, CreateLlmLiteRtCompiledModelExecutor(main_executor_settings,
-                                                       env, *model_resources));
-  } else {
-#if defined(LITERT_DISABLE_NPU)
-    return absl::InvalidArgumentError(
-        "Only CPU and GPU backends are supported.");
-#else
-    ASSIGN_OR_RETURN(executor,
-                     LlmLiteRtNpuCompiledModelExecutor::Create(
-                         engine_settings.GetMainExecutorSettings(),
-                         *model_resources, env, benchmark_info.has_value()));
-#endif  // defined(LITERT_DISABLE_NPU)
-  }
-
+  const auto& main_executor_settings =
+      engine_settings.GetMainExecutorSettings();
+  ASSIGN_OR_RETURN(executor,
+                   CreateLlmLiteRtCompiledModelExecutor(main_executor_settings,
+                                                        env, *model_resources));
   // TODO - b/436674053: Modularize the executor creation logic into a
   // separate executor class, and have unit test for it.
   std::unique_ptr<VisionExecutor> vision_executor;

@@ -4,19 +4,26 @@
 #include <memory>
 #include <string>
 
+#include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/match.h"  // from @com_google_absl
+#include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "litert/cc/litert_environment.h"  // from @litert
 #include "litert/cc/litert_macros.h"  // from @litert
 #include "litert/cc/litert_model.h"  // from @litert
 #include "litert/cc/litert_ranked_tensor_type.h"  // from @litert
 #include "runtime/components/model_resources.h"
+#include "runtime/executor/executor_settings_base.h"
 #include "runtime/executor/litert_compiled_model_executor_utils.h"
 #include "runtime/executor/llm_executor.h"
 #include "runtime/executor/llm_executor_settings.h"
 #include "runtime/executor/llm_litert_compiled_model_executor.h"
 #include "runtime/util/status_macros.h"
+
+#if !defined(LITERT_DISABLE_NPU)
+#include "runtime/executor/llm_litert_npu_compiled_model_executor.h"
+#endif  // !defined(LITERT_DISABLE_NPU)
 
 namespace litert::lm {
 namespace {
@@ -93,12 +100,10 @@ absl::StatusOr<bool> IsDynamicModel(const Model& model) {
   return is_kv_cache_dynamic;
 }
 
-}  // namespace
-
 absl::StatusOr<std::unique_ptr<LlmExecutor>>
-CreateLlmLiteRtCompiledModelExecutor(LlmExecutorSettings executor_settings,
-                                     Environment& lrt_env,
-                                     ModelResources& resources) {
+CreateCpuOrGpuLlmLiteRtCompiledModelExecutor(
+    LlmExecutorSettings executor_settings, Environment& lrt_env,
+    ModelResources& resources) {
   ASSIGN_OR_RETURN(const litert::Model* litert_model,
                    resources.GetTFLiteModel(ModelType::kTfLitePrefillDecode));
 
@@ -113,6 +118,39 @@ CreateLlmLiteRtCompiledModelExecutor(LlmExecutorSettings executor_settings,
   }
 
   return executor;
+}
+
+absl::StatusOr<std::unique_ptr<LlmExecutor>>
+CreateNpuLlmLiteRtCompiledModelExecutor(LlmExecutorSettings executor_settings,
+                                        Environment& lrt_env,
+                                        ModelResources& resources) {
+#if defined(LITERT_DISABLE_NPU)
+  return absl::InvalidArgumentError("Only CPU and GPU backends are supported.");
+#else
+  return LlmLiteRtNpuCompiledModelExecutor::Create(executor_settings, resources,
+                                                   lrt_env);
+#endif  // defined(LITERT_DISABLE_NPU)
+}
+
+}  // namespace
+
+absl::StatusOr<std::unique_ptr<LlmExecutor>>
+CreateLlmLiteRtCompiledModelExecutor(LlmExecutorSettings executor_settings,
+                                     Environment& lrt_env,
+                                     ModelResources& resources) {
+  Backend backend = executor_settings.GetBackend();
+  switch (backend) {
+    case Backend::CPU:
+    case Backend::GPU:
+      return CreateCpuOrGpuLlmLiteRtCompiledModelExecutor(executor_settings,
+                                                          lrt_env, resources);
+    case Backend::NPU:
+      return CreateNpuLlmLiteRtCompiledModelExecutor(executor_settings, lrt_env,
+                                                     resources);
+    default:
+      return absl::InvalidArgumentError(
+          absl::StrCat("Unsupported backend: ", backend));
+  }
 };
 
 }  // namespace litert::lm
