@@ -301,6 +301,12 @@ JNIEXPORT jlong JNICALL JNI_METHOD(nativeCreateEngine)(
   env->ReleaseStringUTFChars(cache_dir, cache_dir_chars);
   if (!cache_dir_str.empty()) {
     settings->GetMutableMainExecutorSettings().SetCacheDir(cache_dir_str);
+    if (vision_backend_optional.has_value()) {
+      settings->GetMutableVisionExecutorSettings()->SetCacheDir(cache_dir_str);
+    }
+    if (audio_backend_optional.has_value()) {
+      settings->GetMutableAudioExecutorSettings()->SetCacheDir(cache_dir_str);
+    }
   }
 
   if (max_num_tokens > 0) {
