@@ -1,0 +1,77 @@
+/*
+ * Copyright 2025 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.google.ai.edge.litertlm.example
+
+import com.google.ai.edge.litertlm.Content
+import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.Message
+import com.google.ai.edge.litertlm.MessageCallback
+import java.util.concurrent.CountDownLatch
+
+// ANSI color codes
+const val ANSI_RESET = "\u001B[0m"
+const val ANSI_YELLOW = "\u001B[33m"
+
+fun main(args: Array<String>) {
+  val modelPath: String =
+    args.getOrNull(0)
+      ?: throw IllegalArgumentException("Model path must be provided as the first argument.")
+
+  val engine = Engine(EngineConfig(modelPath = modelPath))
+  engine.initialize()
+
+  engine.use { engine ->
+    val conversationConfig =
+      ConversationConfig(systemMessage = Message.of("You are a helpful assistant."))
+
+    engine.createConversation(conversationConfig).use { conversation ->
+      while (true) {
+        print(">>> ")
+        val input = readln()
+
+        val userMessage = Message.of(input)
+        val latch = CountDownLatch(1)
+        conversation.sendMessageAsync(
+          userMessage,
+          object : MessageCallback {
+            override fun onMessage(message: Message) {
+              for (content in message.contents) {
+                if (content is Content.Text) {
+                  print(ANSI_YELLOW)
+                  print(content.text)
+                  print(ANSI_RESET)
+                }
+              }
+            }
+
+            override fun onDone() {
+              println()
+              latch.countDown()
+            }
+
+            override fun onError(throwable: Throwable) {
+              println("Error: ${throwable.message}")
+              latch.countDown()
+            }
+          },
+        )
+        latch.await()
+      }
+    }
+  }
+}
