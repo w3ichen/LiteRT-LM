@@ -644,7 +644,6 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
-            "@litert//litert/c/options:litert_qualcomm_options",
             "@litert//litert/cc:litert_common",
             "@litert//litert/cc:litert_compiled_model",
             "@litert//litert/cc:litert_environment",
