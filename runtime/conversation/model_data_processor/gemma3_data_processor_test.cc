@@ -685,7 +685,9 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolCalls) {
 
 TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolResponse) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
-  const nlohmann::ordered_json message = nlohmann::ordered_json::parse(R"json({
+
+  // Case 1: tool_response key
+  const nlohmann::ordered_json message1 = nlohmann::ordered_json::parse(R"json({
     "role": "tool",
     "content": [
       {
@@ -698,9 +700,54 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolResponse) {
     ]
   })json");
 
-  // The template input should contain a tool_outputs item with the tool
-  // response formatted as a Python dict.
-  EXPECT_THAT(processor->MessageToTemplateInput(message),
+  EXPECT_THAT(processor->MessageToTemplateInput(message1),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"key1\": \"value1\", \"key2\": \"value2\"}"
+                  }
+                ]
+              })json")));
+
+  // Case 2: response key
+  const nlohmann::ordered_json message2 = nlohmann::ordered_json::parse(R"json({
+    "role": "tool",
+    "content": [
+      {
+        "type": "response",
+        "response": {
+          "key1": "value1",
+          "key2": "value2"
+        }
+      }
+    ]
+  })json");
+
+  EXPECT_THAT(processor->MessageToTemplateInput(message2),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
+                "role": "tool",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"key1\": \"value1\", \"key2\": \"value2\"}"
+                  }
+                ]
+              })json")));
+
+  // Case 3: Top-level fields
+  const nlohmann::ordered_json message3 = nlohmann::ordered_json::parse(R"json({
+    "role": "tool",
+    "content": [
+      {
+        "key1": "value1",
+        "key2": "value2"
+      }
+    ]
+  })json");
+
+  EXPECT_THAT(processor->MessageToTemplateInput(message3),
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
                 "role": "tool",
                 "content": [
@@ -725,11 +772,15 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithMultipleToolResponses) {
         }
       },
       {
-        "type": "tool_response",
-        "tool_response": {
+        "type": "response",
+        "response": {
           "key3": "value3",
           "key4": "value4"
         }
+      },
+      {
+        "key5": "value5",
+        "key6": "value6"
       }
     ]
   })json");
@@ -747,6 +798,10 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithMultipleToolResponses) {
                   {
                     "type": "text",
                     "text": "{\"key3\": \"value3\", \"key4\": \"value4\"}"
+                  },
+                  {
+                    "type": "text",
+                    "text": "{\"key5\": \"value5\", \"key6\": \"value6\"}"
                   }
                 ]
               })json")));
@@ -771,6 +826,54 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolResponseAsObject) {
               IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
                 "role": "tool",
                 "content": "{\"key1\": \"value1\", \"key2\": \"value2\"}"
+              })json")));
+}
+
+TEST(Gemma3DataProcessorTest,
+     MessageToTemplateInputWithToolResponseAsObjectWithKeys) {
+  ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
+
+  // Case 1: tool_response key
+  const nlohmann::ordered_json message1 = nlohmann::ordered_json::parse(R"json({
+    "role": "tool",
+    "content": {
+      "tool_response": {
+        "key1": "value1"
+      }
+    }
+  })json");
+  EXPECT_THAT(processor->MessageToTemplateInput(message1),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
+                "role": "tool",
+                "content": "{\"key1\": \"value1\"}"
+              })json")));
+
+  // Case 2: response key
+  const nlohmann::ordered_json message2 = nlohmann::ordered_json::parse(R"json({
+    "role": "tool",
+    "content": {
+      "response": {
+        "key2": "value2"
+      }
+    }
+  })json");
+  EXPECT_THAT(processor->MessageToTemplateInput(message2),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
+                "role": "tool",
+                "content": "{\"key2\": \"value2\"}"
+              })json")));
+
+  // Case 3: Top-level fields
+  const nlohmann::ordered_json message3 = nlohmann::ordered_json::parse(R"json({
+    "role": "tool",
+    "content": {
+      "key3": "value3"
+    }
+  })json");
+  EXPECT_THAT(processor->MessageToTemplateInput(message3),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json({
+                "role": "tool",
+                "content": "{\"key3\": \"value3\"}"
               })json")));
 }
 

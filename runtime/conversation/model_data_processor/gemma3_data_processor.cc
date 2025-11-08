@@ -64,6 +64,44 @@ bool IsToolMessage(const ordered_json& message) {
   return message.contains("role") && message["role"] == "tool";
 }
 
+// Formats a tool response in Python format.
+//
+// The fields of the tool response may be under the key "tool_response",
+// "response", or at the top-level.
+//
+// Example:
+//
+// Input:
+//
+// ```json
+// {
+//   "tool_response": {
+//     "key1": "bar",
+//     "key2": true
+//   }
+// }
+// ```
+//
+// Output:
+//
+// ```
+// {"key1": "bar", "key2": True}
+// ```
+
+absl::StatusOr<std::string> FormatToolResponse(
+    const ordered_json& tool_response) {
+  absl::string_view tool_response_key;
+  if (tool_response.contains("tool_response")) {
+    tool_response_key = "tool_response";
+  } else if (tool_response.contains("response")) {
+    tool_response_key = "response";
+  } else {
+    return FormatValueAsPython(tool_response);
+  }
+
+  return FormatValueAsPython(tool_response[tool_response_key]);
+}
+
 }  // namespace
 
 absl::StatusOr<std::unique_ptr<Gemma3DataProcessor>>
@@ -90,30 +128,27 @@ absl::StatusOr<ordered_json> Gemma3DataProcessor::MessageToTemplateInput(
     template_input["role"] = message["role"];
   }
 
+  // Process content.
   if (message.contains("content")) {
-    // If the role is "tool", then convert "tool_response" items into "text"
-    // items, converting JSON to Python. All other content items are passed
-    // through unchanged.
+    // If the role is "tool", convert the tool responses to Python format.
     if (IsToolMessage(message)) {
       if (message["content"].is_array()) {
+        // If the content is an array, treat each item as a tool response.
         template_input["content"] = ordered_json::array();
         for (const auto& item : message["content"]) {
-          if (item.contains("tool_response")) {
-            ASSIGN_OR_RETURN(std::string formatted_tool_response,
-                             FormatValueAsPython(item["tool_response"]));
-            template_input["content"].push_back(
-                {{"type", "text"}, {"text", formatted_tool_response}});
-          } else {
-            template_input["content"].push_back(item);
-          }
+          ASSIGN_OR_RETURN(std::string formatted_tool_response,
+                           FormatToolResponse(item));
+          template_input["content"].push_back(
+              {{"type", "text"}, {"text", formatted_tool_response}});
         }
-      } else if (message["content"].is_object() &&
-                 message["content"].contains("tool_response")) {
-        ASSIGN_OR_RETURN(
-            std::string formatted_tool_response,
-            FormatValueAsPython(message["content"]["tool_response"]));
+      } else if (message["content"].is_object()) {
+        // If the content is an object, treat it as a single tool response.
+        ASSIGN_OR_RETURN(std::string formatted_tool_response,
+                         FormatToolResponse(message["content"]));
         template_input["content"] = formatted_tool_response;
       } else {
+        // If the content is neither an array nor an object, pass it through
+        // unchanged.
         template_input["content"] = message["content"];
       }
     } else {
