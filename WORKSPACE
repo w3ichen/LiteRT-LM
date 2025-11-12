@@ -172,6 +172,8 @@ maven_install(
     name = "maven",
     artifacts = [
         "com.google.code.gson:gson:2.13.2",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.9.0",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0",
     ],
     repositories = [
         "https://maven.google.com",

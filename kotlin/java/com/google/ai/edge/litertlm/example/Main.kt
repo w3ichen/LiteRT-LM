@@ -20,17 +20,10 @@ import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
-import com.google.ai.edge.litertlm.MessageCallback
-import java.util.concurrent.CountDownLatch
 
-// ANSI color codes
-const val ANSI_RESET = "\u001B[0m"
-const val ANSI_YELLOW = "\u001B[33m"
-
-fun main(args: Array<String>) {
-  val modelPath: String =
-    args.getOrNull(0)
-      ?: throw IllegalArgumentException("Model path must be provided as the first argument.")
+suspend fun main(args: Array<String>) {
+  val modelPath =
+    requireNotNull(args.getOrNull(0)) { "Model path must be provided as the first argument." }
 
   val engine = Engine(EngineConfig(modelPath = modelPath, backend = Backend.CPU))
   engine.initialize()
@@ -42,32 +35,12 @@ fun main(args: Array<String>) {
     engine.createConversation(conversationConfig).use { conversation ->
       while (true) {
         print(">>> ")
-        val input = readln()
-
-        val userMessage = Message.of(input)
-        val latch = CountDownLatch(1)
-        conversation.sendMessageAsync(
-          userMessage,
-          object : MessageCallback {
-            override fun onMessage(message: Message) {
-              print(ANSI_YELLOW)
-              print(message)
-              print(ANSI_RESET)
-            }
-
-            override fun onDone() {
-              println()
-              latch.countDown()
-            }
-
-            override fun onError(throwable: Throwable) {
-              println("Error: ${throwable.message}")
-              latch.countDown()
-            }
-          },
-        )
-        latch.await()
+        conversation.sendMessageAsync(Message.of(readln())).collect { print(YELLOW + it + RESET) }
       }
     }
   }
 }
+
+// ANSI color codes
+const val RESET = "\u001B[0m"
+const val YELLOW = "\u001B[33m"

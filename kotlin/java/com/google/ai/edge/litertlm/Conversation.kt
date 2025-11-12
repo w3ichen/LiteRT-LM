@@ -20,6 +20,9 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import java.util.concurrent.CancellationException
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 /**
  * Represents a conversation with the LiteRT-LM model.
@@ -29,22 +32,26 @@ import java.util.concurrent.atomic.AtomicBoolean
  * // Assuming 'engine' is an instance of LiteRtLm
  * val conversation = engine.createConversation()
  *
+ * // Send a message and get the response.
+ * val response = conversation.sendMessage(Message.of("Hello world"))
+ *
+ * // Send a message async with response chunks as Kotlin Flow.
+ * conversation.sendMessageAsync(Message.of("Hello world")).collect { print(it) }
+ *
+ * // Send a message async with response chunks as a callback.
  * conversation.sendMessageAsync(
  *   Message.of("Hello world"),
  *   object : MessageCallback {
  *     override fun onMessage(message: Message) {
- *       // Handle the streaming response
- *       println("Response: ${message.contents[0] as Content.Text).text}")
+ *       print(message) // Handle the streaming response
  *     }
  *
  *     override fun onDone() {
- *       // Handle the end of the response
- *       println("Done")
+ *       // Done
  *     }
  *
  *     override fun onError(error: Throwable) {
  *       // Handle any errors
- *       println("Error: ${error.message}")
  *     }
  *   },
  * )
@@ -104,7 +111,7 @@ class Conversation(private val handle: Long, val toolManager: ToolManager) : Aut
   }
 
   /**
-   * Send message from the given contents in a async fashion.
+   * Send a message to the model and returns the response aysnc with a callback.
    *
    * This method handles potential tool calls returned by the model. If a tool call is detected, the
    * corresponding tool is executed, and the result is sent back to the model. This process is
@@ -126,6 +133,39 @@ class Conversation(private val handle: Long, val toolManager: ToolManager) : Aut
         add("content", message.toJson())
       }
     LiteRtLmJni.nativeSendMessageAsync(handle, messageJSONObject.toString(), jniCallback)
+  }
+
+  /**
+   * Sends a message to the model and returns the response async as a [Flow].
+   *
+   * This method handles potential tool calls returned by the model. If a tool call is detected, the
+   * corresponding tool is executed, and the result is sent back to the model. This process is
+   * repeated until the model returns a final response without tool calls, up to
+   * [RECURRING_TOOL_CALL_LIMIT] times.
+   *
+   * @param message The message to send to the model.
+   * @return A Flow of messages representing the model's response.
+   * @throws IllegalStateException if the conversation has already been closed or the content is
+   *   empty.
+   */
+  fun sendMessageAsync(message: Message): Flow<Message> = callbackFlow {
+    sendMessageAsync(
+      message,
+      object : MessageCallback {
+        override fun onMessage(message: Message) {
+          val unused = trySend(message)
+        }
+
+        override fun onDone() {
+          close()
+        }
+
+        override fun onError(throwable: Throwable) {
+          close(throwable)
+        }
+      },
+    )
+    awaitClose {}
   }
 
   private fun handleToolCalls(toolCallsJsonObject: JsonObject): JsonObject {

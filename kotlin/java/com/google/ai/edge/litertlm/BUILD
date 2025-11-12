@@ -25,6 +25,7 @@ kt_jvm_library(
     deps = [
         "@rules_kotlin//kotlin/compiler:kotlin-reflect",
         "@maven//:com_google_code_gson_gson",
+        "@maven//:org_jetbrains_kotlinx_kotlinx_coroutines_core_jvm"
     ],
 )
 
@@ -34,5 +35,6 @@ kt_android_library(
     deps = [
         "@rules_kotlin//kotlin/compiler:kotlin-reflect",
         "@maven//:com_google_code_gson_gson",
+        "@maven//:org_jetbrains_kotlinx_kotlinx_coroutines_android"
     ],
 )

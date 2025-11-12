@@ -69,29 +69,21 @@ this on a background thread or coroutine to avoid blocking the UI thread.
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
-import android.content.Context
-import android.util.Log
 
 // Assuming 'context' is your Application Context
 val engineConfig = EngineConfig(
     modelPath = "/path/to/your/model.litertlm", // Replace with your model path
     backend = Backend.CPU, // Or Backend.GPU
-    cacheDir = context.cacheDir.path // Pick a writable dir. This can improve 2nd load time.
+    // optional: Pick a writable dir. This can improve 2nd load time.
+    // cacheDir = "/tmp/" or context.cacheDir.path (for Android)
 )
 
-var engine: Engine? = null
-try {
-    engine = Engine(engineConfig)
-    engine.initialize()
-    Log.i("LiteRtLmApi", "Engine initialized successfully")
-} catch (e: Exception) {
-    Log.e("LiteRtLmApi", "Failed to initialize engine", e)
-}
-
+val engine = Engine(engineConfig)
+engine.initialize()
 // ... Use the engine to create conversation ...
 
 // Close the engine when done
-// engine?.close()
+engine.close()
 ```
 
 ### 3. Create a Conversation
@@ -117,7 +109,7 @@ val conversation = engine.createConversation(conversationConfig)
 // ... Use the conversation ...
 
 // Close the conversation when done
-// conversation.close()
+conversation.close()
 ```
 
 `Conversation` implements `AutoCloseable`, so you can use the `use` block for
@@ -131,7 +123,7 @@ engine.createConversation(conversationConfig).use { conversation ->
 
 ### 4. Sending Messages
 
-There are two ways to send messages:
+There are three ways to send messages:
 
 -   **`sendMessage(message: Message): Message`**: Synchronous call that blocks
     until the model returns a complete response. This is simpler for basic
@@ -140,6 +132,9 @@ There are two ways to send messages:
     Asynchronous call for streaming responses. This is better for long-running
     requests or when you want to display the response as it's being
     generated.
+-   **`sendMessageAsync(message: Message): Flow<Message>`**: Asynchronous call
+    that returns a Kotlin Flow for streaming responses. This is the recommended
+    approach for Coroutine users.
 
 **Synchronous Example:**
 
@@ -148,11 +143,10 @@ import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Message
 
 val userMessage = Message.of("What is the capital of France?")
-val modelMessage = conversation.sendMessage(userMessage)
-print(modelMessage)
+print(conversation.sendMessage(userMessage))
 ```
 
-**Asynchronous Example:**
+**Asynchronous Example with callback:**
 
 Use `sendMessageAsync` to send a message to the model and receive responses
 through callback.
@@ -170,11 +164,11 @@ val callback = object : MessageCallback {
     }
 
     override fun onDone() {
-        Log.i("LiteRtLmApi", "Streaming complete.")
+        // Streaming completed
     }
 
     override fun onError(throwable: Throwable) {
-        Log.e("LiteRtLmApi", "Error during streaming", throwable)
+        // Error during streaming
     }
 }
 
@@ -182,22 +176,37 @@ val userMessage = Message.of("What is the capital of France?")
 conversation.sendMessageAsync(userMessage, callback)
 ```
 
+**Asynchronous Example with Flow:**
+
+Use `sendMessageAsync` (without the callback arg) to send a message to the model
+and receive responses through a Kotlin Flow.
+
+```kotlin
+import com.google.ai.edge.litertlm.Content
+import com.google.ai.edge.litertlm.Message
+import kotlinx.coroutines.launch
+
+// Within a coroutine scope
+val userMessage = Message.of("What is the capital of France?")
+conversation.sendMessageAsync(userMessage)
+    .catch { ... } // error during streaming
+    .collect{ print(it.toString()) }
+```
+
 ### 5. Multi-Modality
 
 `Message` objects can contain different types of `Content`, including `Text`,
-`ImageBytes`, and `AudioBytes`.
+`ImageBytes`, `ImageFile`, and `AudioBytes`, `AudioFile`.
 
 ```kotlin
-val imageBytes: ByteArray = // Load image bytes
 val audioBytes: ByteArray = // Load audio bytes
 
+// See the Content class for other variants.
 val multiModalMessage = Message.of(
-    Content.ImageBytes(imageBytes),
+    Content.ImageFile("/path/to/image"),
     Content.AudioBytes(audioBytes),
     Content.Text("Describe this image and audio."),
 )
-
-conversation.sendMessageAsync(multiModalMessage, callback)
 ```
 
 ### 6. Defining and Using Tools
