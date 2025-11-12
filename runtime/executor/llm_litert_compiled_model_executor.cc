@@ -1106,7 +1106,8 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
   // For the LlmLiteRtCompiledModelExecutorStatic, ML_DRIFT backend is used by
   // default.
   // TODO(b/405424188): - Add support for NPU backends.
-  auto compilation_options = ::litert::Options::Create();
+  LITERT_ASSIGN_OR_RETURN(auto compilation_options,
+                          ::litert::Options::Create());
   std::string weight_cache_path = executor_settings.GetCacheDir();
   auto activation_data_type = ActivationDataType::FLOAT16;
   // TODO(b/433590109): Some GPUs do not support FP16, so we need to check the
@@ -1118,8 +1119,8 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
   switch (backend) {
     case Backend::GPU: {
       // TODO: b/403132820 - Add accelerator compilation options for ML_DRIFT.
-      LITERT_ASSIGN_OR_RETURN(auto gpu_compilation_options,
-                              GpuOptions::Create());
+      LITERT_ASSIGN_OR_RETURN(auto& gpu_compilation_options,
+                              compilation_options.GetGpuOptions());
       gpu_compilation_options.EnableConstantTensorSharing(true);
       gpu_compilation_options.EnableInfiniteFloatCapping(true);
       gpu_compilation_options.EnableAllowSrcQuantizedFcConvOps(true);
@@ -1173,9 +1174,7 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
       // buffer preparation. 2 steps ahead because KV cache is swapped and the
       // GPU resource bindings are the same as the previous previous step.
       gpu_compilation_options.SetNumStepsOfCommandBufferPreparations(2);
-      compilation_options->AddOpaqueOptions(std::move(gpu_compilation_options));
-      compilation_options->SetHardwareAccelerators(
-          litert::HwAccelerators::kGpu);
+      compilation_options.SetHardwareAccelerators(litert::HwAccelerators::kGpu);
       break;
     }
     case Backend::CPU: {
@@ -1205,11 +1204,9 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
           TFLITE_XNNPACK_DELEGATE_FLAG_ENABLE_LATEST_OPERATORS);
       LITERT_ASSIGN_OR_RETURN(auto runtime_options, RuntimeOptions::Create());
       runtime_options.SetShloCompositeInlining(true);
-      compilation_options->AddOpaqueOptions(std::move(runtime_options));
-      compilation_options->AddOpaqueOptions(
-          std::move(*cpu_compilation_options));
-      compilation_options->SetHardwareAccelerators(
-          litert::HwAccelerators::kCpu);
+      compilation_options.AddOpaqueOptions(std::move(runtime_options));
+      compilation_options.AddOpaqueOptions(std::move(*cpu_compilation_options));
+      compilation_options.SetHardwareAccelerators(litert::HwAccelerators::kCpu);
       break;
     }
     default:
@@ -1223,8 +1220,7 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
 
   LITERT_ASSIGN_OR_RETURN(
       auto compiled_model,
-      CompiledModel::Create(lrt_env, *litert_model,
-                            std::move(*compilation_options)));
+      CompiledModel::Create(lrt_env, *litert_model, compilation_options));
 
   absl::flat_hash_map<absl::string_view, TensorBuffer> decode_input_buffers;
   absl::flat_hash_map<absl::string_view, TensorBuffer> decode_output_buffers;
@@ -1542,7 +1538,8 @@ LlmLiteRtCompiledModelExecutorDynamic::Create(
     ModelResources& resources) {
   ASSIGN_OR_RETURN(auto litert_model,
                    resources.GetTFLiteModel(ModelType::kTfLitePrefillDecode));
-  auto compilation_options = ::litert::Options::Create();
+  LITERT_ASSIGN_OR_RETURN(auto compilation_options,
+                          ::litert::Options::Create());
   std::string weight_cache_path = executor_settings.GetCacheDir();
   const Backend backend = executor_settings.GetBackend();
   RET_CHECK_EQ(backend, Backend::CPU)
@@ -1578,15 +1575,14 @@ LlmLiteRtCompiledModelExecutorDynamic::Create(
         TFLITE_XNNPACK_DELEGATE_FLAG_ENABLE_LATEST_OPERATORS);
     LITERT_ASSIGN_OR_RETURN(auto runtime_options, RuntimeOptions::Create());
     runtime_options.SetShloCompositeInlining(true);
-    compilation_options->AddOpaqueOptions(std::move(runtime_options));
-    compilation_options->AddOpaqueOptions(std::move(*cpu_compilation_options));
-    compilation_options->SetHardwareAccelerators(litert::HwAccelerators::kCpu);
+    compilation_options.AddOpaqueOptions(std::move(runtime_options));
+    compilation_options.AddOpaqueOptions(std::move(*cpu_compilation_options));
+    compilation_options.SetHardwareAccelerators(litert::HwAccelerators::kCpu);
   }
 
   LITERT_ASSIGN_OR_RETURN(
       auto compiled_model,
-      CompiledModel::Create(lrt_env, *litert_model,
-                            std::move(*compilation_options)));
+      CompiledModel::Create(lrt_env, *litert_model, compilation_options));
 
   absl::flat_hash_map<absl::string_view, TensorBuffer> decode_input_buffers;
   absl::flat_hash_map<absl::string_view, TensorBuffer> decode_output_buffers;
