@@ -45,7 +45,7 @@ enum class ModelType {
   kTfLiteEndOfAudio = 6,
   kTfLiteVisionAdapter = 7,
   kTfLiteVisionEncoder = 8,
-  kArtisanTextDecoder = 11,
+  kArtisanTextDecoder = 11,  // The text decoder model for the artisan gpu.
 };
 
 // Utility function to convert a string to ModelType. It's case insensitive.
@@ -73,7 +73,7 @@ inline absl::StatusOr<ModelType> StringToModelType(
     return ModelType::kTfLiteVisionAdapter;
   } else if (lower_case_model_type_str == "tf_lite_vision_encoder") {
     return ModelType::kTfLiteVisionEncoder;
-  } else if (lower_case_model_type_str == "artisan_text_decoder") {
+  } else if (lower_case_model_type_str == "tf_lite_artisan_text_decoder") {
     return ModelType::kArtisanTextDecoder;
   } else {
     return absl::InvalidArgumentError(
@@ -105,7 +105,7 @@ inline std::string ModelTypeToString(ModelType model_type) {
     case ModelType::kTfLiteVisionEncoder:
       return "TF_LITE_VISION_ENCODER";
     case ModelType::kArtisanTextDecoder:
-      return "ARTISAN_TEXT_DECODER";
+      return "TF_LITE_ARTISAN_TEXT_DECODER";
     case ModelType::kUnknown:
       return "UNKNOWN";
     default:

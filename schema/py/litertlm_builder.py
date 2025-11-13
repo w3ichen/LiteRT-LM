@@ -107,6 +107,7 @@ class TfLiteModelType(enum.Enum):
 
   VISION_ENCODER = "tf_lite_vision_encoder"
   VISION_ADAPTER = "tf_lite_vision_adapter"
+  ARTISAN_TEXT_DECODER = "tf_lite_artisan_text_decoder"
 
   @classmethod
   def get_enum_from_tf_free_value(cls, tf_free_value: str) -> "TfLiteModelType":
@@ -122,6 +123,7 @@ class Backend(enum.StrEnum):
   CPU = "cpu"
   GPU = "gpu"
   NPU = "npu"
+  GPU_ARTISAN = "gpu_artisan"
 
 
 @dataclasses.dataclass
