@@ -167,11 +167,21 @@ inline absl::StatusOr<InputData> CreateInputDataCopy(const InputData& data) {
 
 // The state of the task.
 enum class TaskState {
-  kUnknown,              // The task is in an unknown state.
-  kProcessing,           // The task is being processed.
-  kDone,                 // The task is done successfully.
-  kMaxNumTokensReached,  // The task is done because the max number of tokens is
-                         // reached.
+  kUnknown,               // The task is in an unknown state.
+  kCreated,               // The task is created and waiting for other dependent
+                          // tasks.
+                          // For example, the decode task is waiting for the
+                          // prefill task to be done.
+  kQueued,                // The task is queued to be processed.
+                          // For example, the decode task is queued to be
+                          // processed after the prefill task is done.
+  kProcessing,            // The task is being processed.
+  kDone,                  // The task is done.
+  kMaxNumTokensReached,   // The task is done because the max number of tokens
+                          // is reached.
+  kFailed,                // The task is failed.
+  kDependentTaskFailed,   // The task was cancelled because a dependent task
+                          // failed.
 };
 std::ostream& operator<<(std::ostream& os, const TaskState& task_state);
 

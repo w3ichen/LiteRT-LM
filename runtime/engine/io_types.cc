@@ -129,6 +129,12 @@ absl::StatusOr<InputAudio> InputAudio::CreateCopy() const {
 
 std::ostream& operator<<(std::ostream& os, const TaskState& task_state) {
   switch (task_state) {
+    case TaskState::kCreated:
+      os << "Created";
+      break;
+    case TaskState::kQueued:
+      os << "Queued";
+      break;
     case TaskState::kProcessing:
       os << "Processing";
       break;
@@ -137,6 +143,12 @@ std::ostream& operator<<(std::ostream& os, const TaskState& task_state) {
       break;
     case TaskState::kMaxNumTokensReached:
       os << "MaxNumTokensReached";
+      break;
+    case TaskState::kFailed:
+      os << "Failed";
+      break;
+    case TaskState::kDependentTaskFailed:
+      os << "DependentTaskFailed";
       break;
     default:
       os << "Unknown";

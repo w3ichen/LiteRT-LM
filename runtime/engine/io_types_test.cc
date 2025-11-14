@@ -405,6 +405,14 @@ TEST(CreateInputDataCopyTest, InputAudio) {
 
 TEST(ResponsesTest, GetTaskState) {
   {
+    Responses responses(TaskState::kCreated, {});
+    EXPECT_EQ(responses.GetTaskState(), TaskState::kCreated);
+  }
+  {
+    Responses responses(TaskState::kQueued, {});
+    EXPECT_EQ(responses.GetTaskState(), TaskState::kQueued);
+  }
+  {
     Responses responses(TaskState::kProcessing, {});
     EXPECT_EQ(responses.GetTaskState(), TaskState::kProcessing);
   }
@@ -417,12 +425,30 @@ TEST(ResponsesTest, GetTaskState) {
     EXPECT_EQ(responses.GetTaskState(), TaskState::kMaxNumTokensReached);
   }
   {
+    Responses responses(TaskState::kFailed, {});
+    EXPECT_EQ(responses.GetTaskState(), TaskState::kFailed);
+  }
+  {
+    Responses responses(TaskState::kDependentTaskFailed, {});
+    EXPECT_EQ(responses.GetTaskState(), TaskState::kDependentTaskFailed);
+  }
+  {
     Responses responses(TaskState::kUnknown, {});
     EXPECT_EQ(responses.GetTaskState(), TaskState::kUnknown);
   }
 }
 
 TEST(ResponsesTest, TaskStateToString) {
+  {
+    std::stringstream ss;
+    ss << TaskState::kCreated;
+    EXPECT_EQ(ss.str(), "Created");
+  }
+  {
+    std::stringstream ss;
+    ss << TaskState::kQueued;
+    EXPECT_EQ(ss.str(), "Queued");
+  }
   {
     std::stringstream ss;
     ss << TaskState::kProcessing;
@@ -437,6 +463,16 @@ TEST(ResponsesTest, TaskStateToString) {
     std::stringstream ss;
     ss << TaskState::kMaxNumTokensReached;
     EXPECT_EQ(ss.str(), "MaxNumTokensReached");
+  }
+  {
+    std::stringstream ss;
+    ss << TaskState::kFailed;
+    EXPECT_EQ(ss.str(), "Failed");
+  }
+  {
+    std::stringstream ss;
+    ss << TaskState::kDependentTaskFailed;
+    EXPECT_EQ(ss.str(), "DependentTaskFailed");
   }
   {
     std::stringstream ss;
