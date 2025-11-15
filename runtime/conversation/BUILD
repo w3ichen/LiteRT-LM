@@ -52,6 +52,9 @@ cc_library(
 cc_test(
     name = "internal_callback_util_test",
     srcs = ["internal_callback_util_test.cc"],
+    data = [
+        "//runtime/components/testdata",
+    ],
     deps = [
         ":internal_callback_util",
         ":io_types",
@@ -121,6 +124,7 @@ cc_test(
         "@com_google_absl//absl/time",
         "@nlohmann_json//:json",
         "//runtime/components:prompt_template",
+        "//runtime/components:sentencepiece_tokenizer",
         "//runtime/components:tokenizer",
         "//runtime/core:session_factory",
         "//runtime/engine:engine_interface",

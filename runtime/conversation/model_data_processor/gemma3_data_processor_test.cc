@@ -18,6 +18,8 @@
 #include <fstream>
 #include <ios>
 #include <iterator>
+#include <memory>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -37,6 +39,8 @@
 #include "runtime/components/preprocessor/image_preprocessor.h"
 #include "runtime/components/preprocessor/stb_image_preprocessor.h"
 #include "runtime/components/prompt_template.h"
+#include "runtime/components/sentencepiece_tokenizer.h"
+#include "runtime/components/tokenizer.h"
 #include "runtime/conversation/io_types.h"
 #include "runtime/conversation/model_data_processor/gemma3_data_processor_config.h"
 #include "runtime/engine/io_types.h"
@@ -139,7 +143,19 @@ MATCHER_P(HasInputAudio, audio_input, "") {
   return true;
 }
 
-TEST(Gemma3DataProcessorTest, ToInputDataVectorTextOnly) {
+class Gemma3DataProcessorTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    auto tokenizer = SentencePieceTokenizer::CreateFromFile(
+        GetTestdataPath("gemma3_sentencepiece.model"));
+    ASSERT_OK(tokenizer);
+    tokenizer_ = std::move(*tokenizer);
+  }
+
+  std::unique_ptr<Tokenizer> tokenizer_;
+};
+
+TEST_F(Gemma3DataProcessorTest, ToInputDataVectorTextOnly) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   const std::string rendered_template_prompt =
       "<start_of_turn>user\ntest prompt\n<end_of_turn>";
@@ -155,11 +171,11 @@ TEST(Gemma3DataProcessorTest, ToInputDataVectorTextOnly) {
   EXPECT_THAT(input_data, ElementsAre(HasInputText(&expected_text)));
 }
 
-TEST(Gemma3DataProcessorTest, ToInputDataVectorTextAndImage) {
+TEST_F(Gemma3DataProcessorTest, ToInputDataVectorTextAndImage) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create(
-                                           /*Gemma3DataProcessorConfig=*/{
-                                               .image_tensor_height = 224,
-                                               .image_tensor_width = 128}));
+                                           /*Gemma3DataProcessorConfig=*/
+                                           {.image_tensor_height = 224,
+                                            .image_tensor_width = 128}));
   const std::string rendered_template_prompt =
       "<start_of_turn>user\nHere is an image of apples "
       "<start_of_image><end_of_turn>";
@@ -194,7 +210,7 @@ TEST(Gemma3DataProcessorTest, ToInputDataVectorTextAndImage) {
                                       HasInputText(&expected_text3)));
 }
 
-TEST(Gemma3DataProcessorTest, ToInputDataVectorNonArrayContent) {
+TEST_F(Gemma3DataProcessorTest, ToInputDataVectorNonArrayContent) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   const std::string rendered_template_prompt =
       "<start_of_turn>user\ntest prompt<end_of_turn>";
@@ -211,7 +227,7 @@ TEST(Gemma3DataProcessorTest, ToInputDataVectorNonArrayContent) {
   EXPECT_THAT(input_data, ElementsAre(HasInputText(&expected_text)));
 }
 
-TEST(Gemma3DataProcessorTest, ToMessage) {
+TEST_F(Gemma3DataProcessorTest, ToMessage) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
 
   ASSERT_OK_AND_ASSIGN(
@@ -228,7 +244,7 @@ TEST(Gemma3DataProcessorTest, ToMessage) {
             {"content", {{{"type", "text"}, {"text", "test response"}}}}}));
 }
 
-TEST(Gemma3DataProcessorTest, ToMessageWithToolCall) {
+TEST_F(Gemma3DataProcessorTest, ToMessageWithToolCall) {
   Gemma3DataProcessorConfig config;
   JsonPreface preface{.tools = nlohmann::ordered_json::parse(
                           R"json([{
@@ -277,7 +293,7 @@ TEST(Gemma3DataProcessorTest, ToMessageWithToolCall) {
   })json"));
 }
 
-TEST(Gemma3DataProcessorTest, ToMessageWithToolCallUsingToolCodeRegex) {
+TEST_F(Gemma3DataProcessorTest, ToMessageWithToolCallUsingToolCodeRegex) {
   Gemma3DataProcessorConfig config;
   JsonPreface preface{.tools = nlohmann::ordered_json::parse(
                           R"json([{
@@ -398,7 +414,7 @@ print(default_api.another_tool())
             })json"));
 }
 
-TEST(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextOnly) {
+TEST_F(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextOnly) {
   const std::string test_file_path =
       GetTestdataPath("google-gemma-3-1b-it.jinja");
   ASSERT_OK_AND_ASSIGN(const std::string template_content,
@@ -435,7 +451,7 @@ What is the capital of France?<end_of_turn>
   EXPECT_THAT(input_data, ElementsAre(HasInputText(&expected_text)));
 }
 
-TEST(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextAndImage) {
+TEST_F(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextAndImage) {
   const std::string test_file_path =
       GetTestdataPath("google-gemma-3-1b-it.jinja");
   ASSERT_OK_AND_ASSIGN(const std::string template_content,
@@ -499,7 +515,7 @@ I am doing well, thanks for asking.<end_of_turn>
                   HasInputText(&expected_text5)));
 }
 
-TEST(Gemma3DataProcessorTest, FormatTools) {
+TEST_F(Gemma3DataProcessorTest, FormatTools) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   nlohmann::ordered_json tools = nlohmann::ordered_json::parse(R"json([
     {
@@ -562,7 +578,7 @@ TEST(Gemma3DataProcessorTest, FormatTools) {
   EXPECT_EQ(formatted_tools, expected);
 }
 
-TEST(Gemma3DataProcessorTest, FormatToolsWithInvalidInput) {
+TEST_F(Gemma3DataProcessorTest, FormatToolsWithInvalidInput) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   // `tools` is not an array.
   nlohmann::ordered_json tools = nlohmann::ordered_json::parse(R"json({
@@ -583,7 +599,7 @@ TEST(Gemma3DataProcessorTest, FormatToolsWithInvalidInput) {
               testing::status::StatusIs(absl::StatusCode::kInvalidArgument));
 }
 
-TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithStringContent) {
+TEST_F(Gemma3DataProcessorTest, MessageToTemplateInputWithStringContent) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   const nlohmann::ordered_json message = {
       {"role", "user"},
@@ -596,7 +612,7 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithStringContent) {
               IsOkAndHolds(message));
 }
 
-TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithTextContent) {
+TEST_F(Gemma3DataProcessorTest, MessageToTemplateInputWithTextContent) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   const nlohmann::ordered_json message = {
       {"role", "user"},
@@ -608,7 +624,7 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithTextContent) {
               IsOkAndHolds(message));
 }
 
-TEST(Gemma3DataProcessorTest, MessageToTemplateInputNoContent) {
+TEST_F(Gemma3DataProcessorTest, MessageToTemplateInputNoContent) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   const nlohmann::ordered_json message = {
       {"role", "user"},
@@ -619,7 +635,7 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputNoContent) {
               IsOkAndHolds(message));
 }
 
-TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolCalls) {
+TEST_F(Gemma3DataProcessorTest, MessageToTemplateInputWithToolCalls) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   const nlohmann::ordered_json message = nlohmann::ordered_json::parse(R"json({
     "role": "assistant",
@@ -683,7 +699,7 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolCalls) {
 })json")));
 }
 
-TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolResponse) {
+TEST_F(Gemma3DataProcessorTest, MessageToTemplateInputWithToolResponse) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
 
   // Case 1: tool_response key
@@ -759,7 +775,8 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolResponse) {
               })json")));
 }
 
-TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithMultipleToolResponses) {
+TEST_F(Gemma3DataProcessorTest,
+       MessageToTemplateInputWithMultipleToolResponses) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   const nlohmann::ordered_json message = nlohmann::ordered_json::parse(R"json({
     "role": "tool",
@@ -807,7 +824,8 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithMultipleToolResponses) {
               })json")));
 }
 
-TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolResponseAsObject) {
+TEST_F(Gemma3DataProcessorTest,
+       MessageToTemplateInputWithToolResponseAsObject) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   const nlohmann::ordered_json message = nlohmann::ordered_json::parse(R"json({
     "role": "tool",
@@ -829,8 +847,8 @@ TEST(Gemma3DataProcessorTest, MessageToTemplateInputWithToolResponseAsObject) {
               })json")));
 }
 
-TEST(Gemma3DataProcessorTest,
-     MessageToTemplateInputWithToolResponseAsObjectWithKeys) {
+TEST_F(Gemma3DataProcessorTest,
+       MessageToTemplateInputWithToolResponseAsObjectWithKeys) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
 
   // Case 1: tool_response key
@@ -877,7 +895,7 @@ TEST(Gemma3DataProcessorTest,
               })json")));
 }
 
-TEST(Gemma3DataProcessorTest, RenderTemplateWithToolCalls) {
+TEST_F(Gemma3DataProcessorTest, RenderTemplateWithToolCalls) {
   // Load the prompt template.
   const std::string test_file_path =
       GetTestdataPath("google-gemma-3n-e2b-it-tools.jinja");
@@ -981,7 +999,7 @@ get_weather(location="London")
 // TODO(b/441514829): Enable the tests on Windows once the bug is fixed.
 #if !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32__) && \
     !defined(__NT__) && !defined(_WIN64)
-TEST(Gemma3DataProcessorTest, ToInputDataVectorTextAndAudio) {
+TEST_F(Gemma3DataProcessorTest, ToInputDataVectorTextAndAudio) {
   ASSERT_OK_AND_ASSIGN(auto processor, Gemma3DataProcessor::Create());
   const std::string rendered_template_prompt =
       "<start_of_turn>user\nHere is an audio. Please transcribe it: "
@@ -1018,7 +1036,7 @@ TEST(Gemma3DataProcessorTest, ToInputDataVectorTextAndAudio) {
                                       HasInputText(&expected_text3)));
 }
 
-TEST(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextAndAudio) {
+TEST_F(Gemma3DataProcessorTest, PromptTemplateToInputDataVectorTextAndAudio) {
   const std::string test_file_path =
       GetTestdataPath("google-gemma-3n-e2b-it.jinja");
   ASSERT_OK_AND_ASSIGN(const std::string template_content,

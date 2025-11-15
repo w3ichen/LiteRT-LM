@@ -17,6 +17,7 @@
 
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "runtime/components/tokenizer.h"
@@ -30,11 +31,16 @@ namespace litert::lm {
 // Creates a ModelDataProcessor instance based on the given model type and
 // config.
 // - config: The config for the model data processor.
-// - tokenizer: The tokenizer used by the LLM model.
 // - preface: The preface for the conversation.
+// - tokenizer: The tokenizer used by the LLM model.
+// - stop_token_ids: The stop token ids used by the LLM model.
+// - enable_constrained_decoding: Whether to enable constrained decoding.
 absl::StatusOr<std::unique_ptr<ModelDataProcessor>> CreateModelDataProcessor(
-    const DataProcessorConfig& config, const Tokenizer& tokenizer,
-    std::optional<Preface> preface = std::nullopt);
+    const DataProcessorConfig& config,
+    std::optional<Preface> preface = std::nullopt,
+    const Tokenizer* tokenizer = nullptr,
+    const std::vector<std::vector<int>>& stop_token_ids = {},
+    bool enable_constrained_decoding = false);
 
 // Creates data processor config from the given LlmModelType. The
 // DataProcessorConfig has default values if the corresponding fields are not

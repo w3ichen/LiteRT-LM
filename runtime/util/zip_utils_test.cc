@@ -43,9 +43,9 @@ TEST(ZipUtilsTest, ExtractFilesFromZipFile) {
 
   EXPECT_THAT(files,
               UnorderedElementsAre(
-                  Pair("TOKENIZER_MODEL", OffsetAndSize{27440208, 4689072}),
                   Pair("TF_LITE_PREFILL_DECODE", OffsetAndSize{56, 27440104}),
-                  Pair("METADATA", OffsetAndSize{32129320, 22})));
+                  Pair("TOKENIZER_MODEL", OffsetAndSize{27440208, 4689074}),
+                  Pair("METADATA", OffsetAndSize{32129324, 22})));
 }
 
 }  // namespace

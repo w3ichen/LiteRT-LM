@@ -29,10 +29,14 @@
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "nlohmann/json_fwd.hpp"  // from @nlohmann_json
 #include "litert/cc/litert_layout.h"  // from @litert
+#include "runtime/components/constrained_decoding/constraint.h"
+#include "runtime/components/constrained_decoding/constraint_provider.h"
 #include "runtime/components/preprocessor/audio_preprocessor.h"
 #include "runtime/components/preprocessor/audio_preprocessor_miniaudio.h"
 #include "runtime/components/preprocessor/image_preprocessor.h"
 #include "runtime/components/preprocessor/stb_image_preprocessor.h"
+#include "runtime/components/sentencepiece_tokenizer.h"
+#include "runtime/components/tokenizer.h"
 #include "runtime/components/tool_use/parser_utils.h"
 #include "runtime/components/tool_use/python_tool_format_utils.h"
 #include "runtime/conversation/io_types.h"
@@ -106,11 +110,15 @@ absl::StatusOr<std::string> FormatToolResponse(
 
 absl::StatusOr<std::unique_ptr<Gemma3DataProcessor>>
 Gemma3DataProcessor::Create(Gemma3DataProcessorConfig config,
-                            std::optional<Preface> preface) {
+                            std::optional<Preface> preface,
+                            const Tokenizer* tokenizer,
+                            const std::vector<std::vector<int>>& stop_token_ids,
+                            bool enable_constrained_decoding) {
   ASSIGN_OR_RETURN(auto audio_preprocessor,
                    AudioPreprocessorMiniAudio::Create(
                        AudioPreprocessorConfig::CreateDefaultUsmConfig()));
   return absl::WrapUnique(new Gemma3DataProcessor(
+      nullptr,
       config, preface, std::make_unique<StbImagePreprocessor>(),
       std::move(audio_preprocessor)));
 }
@@ -317,6 +325,12 @@ absl::StatusOr<ordered_json> Gemma3DataProcessor::FormatTools(
     formatted_tools.push_back(formatted_tool);
   }
   return formatted_tools;
+}
+
+absl::StatusOr<std::unique_ptr<Constraint>>
+Gemma3DataProcessor::CreateConstraint(
+    const nlohmann::ordered_json& tools) const {
+  return nullptr;
 }
 
 absl::string_view Gemma3DataProcessor::CodeFenceStart() const {

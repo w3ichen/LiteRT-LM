@@ -24,8 +24,11 @@
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
 #include "nlohmann/json.hpp"  // from @nlohmann_json
+#include "runtime/components/constrained_decoding/constraint.h"
+#include "runtime/components/constrained_decoding/constraint_provider.h"
 #include "runtime/components/preprocessor/audio_preprocessor.h"
 #include "runtime/components/preprocessor/image_preprocessor.h"
+#include "runtime/components/tokenizer.h"
 #include "runtime/conversation/io_types.h"
 #include "runtime/conversation/model_data_processor/gemma3_data_processor_config.h"
 #include "runtime/conversation/model_data_processor/model_data_processor.h"
@@ -41,7 +44,10 @@ class Gemma3DataProcessor
   // Creates a Gemma3DataProcessor instance.
   static absl::StatusOr<std::unique_ptr<Gemma3DataProcessor>> Create(
       Gemma3DataProcessorConfig config = Gemma3DataProcessorConfig(),
-      std::optional<Preface> preface = std::nullopt);
+      std::optional<Preface> preface = std::nullopt,
+      const Tokenizer* tokenizer = nullptr,
+      const std::vector<std::vector<int>>& stop_token_ids = {},
+      bool enable_constrained_decoding = false);
 
   // Returns the config of the Gemma3DataProcessor.
   const Gemma3DataProcessorConfig& GetConfig() const override {
@@ -56,6 +62,9 @@ class Gemma3DataProcessor
   absl::StatusOr<nlohmann::ordered_json> FormatTools(
       const nlohmann::ordered_json& tools) const override;
 
+  absl::StatusOr<std::unique_ptr<Constraint>> CreateConstraint(
+      const nlohmann::ordered_json& tools) const override;
+
   // Returns the start of tool call blocks.
   absl::string_view CodeFenceStart() const override;
 
@@ -64,11 +73,13 @@ class Gemma3DataProcessor
 
  private:
   explicit Gemma3DataProcessor(
+      std::unique_ptr<ConstraintProvider> constraint_provider,
       const Gemma3DataProcessorConfig& config = Gemma3DataProcessorConfig(),
       std::optional<Preface> preface = std::nullopt,
       std::unique_ptr<ImagePreprocessor> image_preprocessor = nullptr,
       std::unique_ptr<AudioPreprocessor> audio_preprocessor = nullptr)
-      : config_(config),
+      : constraint_provider_(std::move(constraint_provider)),
+        config_(config),
         preface_(preface),
         image_preprocessor_(std::move(image_preprocessor)),
         audio_preprocessor_(std::move(audio_preprocessor)) {};
@@ -82,6 +93,7 @@ class Gemma3DataProcessor
       const Responses& responses,
       const Gemma3DataProcessorArguments& args) const override;
 
+  std::unique_ptr<ConstraintProvider> constraint_provider_;
   Gemma3DataProcessorConfig config_;
   std::optional<Preface> preface_;
   std::unique_ptr<ImagePreprocessor> image_preprocessor_;

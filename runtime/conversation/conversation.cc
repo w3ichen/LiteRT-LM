@@ -208,8 +208,11 @@ absl::StatusOr<std::unique_ptr<Conversation>> Conversation::Create(
                    engine.CreateSession(config.GetSessionConfig()));
   ASSIGN_OR_RETURN(
       std::unique_ptr<ModelDataProcessor> model_data_processor,
-      CreateModelDataProcessor(config.GetProcessorConfig(),
-                               session->GetTokenizer(), config.GetPreface()));
+      CreateModelDataProcessor(config.GetProcessorConfig(), config.GetPreface(),
+                               &session->GetTokenizer(),
+                               session->GetSessionConfig().GetStopTokenIds(),
+                               false
+                               ));
 
   auto conversation = absl::WrapUnique(new Conversation(
       std::move(session), std::move(model_data_processor), config.GetPreface(),

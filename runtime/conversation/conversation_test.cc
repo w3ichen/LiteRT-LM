@@ -14,6 +14,7 @@
 
 #include "runtime/conversation/conversation.h"
 
+#include <filesystem>  // NOLINT: Required for path manipulation.
 #include <memory>
 #include <optional>
 #include <string>
@@ -34,6 +35,7 @@
 #include "absl/time/time.h"  // from @com_google_absl
 #include "nlohmann/json.hpp"  // from @nlohmann_json
 #include "runtime/components/prompt_template.h"
+#include "runtime/components/sentencepiece_tokenizer.h"
 #include "runtime/components/tokenizer.h"
 #include "runtime/conversation/io_types.h"
 #include "runtime/engine/engine.h"
@@ -48,6 +50,9 @@ namespace {
 absl::string_view kTestLlmPath =
     "litert_lm/runtime/testdata/test_lm.litertlm";
 
+constexpr char kTestTokenizerPath[] =
+    "litert_lm/runtime/components/testdata/gemma3_sentencepiece.model";
+
 constexpr absl::string_view kTestJinjaPromptTemplate = R"jinja(
 {%- for message in messages -%}
   {{ '<start_of_turn>' + message.role }}
@@ -58,17 +63,6 @@ constexpr absl::string_view kTestJinjaPromptTemplate = R"jinja(
 std::string GetTestdataPath(absl::string_view file_path) {
   return absl::StrCat(::testing::SrcDir(), "/", file_path);
 }
-
-class MockTokenizer : public Tokenizer {
- public:
-  MOCK_METHOD(absl::StatusOr<std::vector<int>>, TextToTokenIds,
-              (absl::string_view text), (override));
-  MOCK_METHOD(absl::StatusOr<std::string>, TokenIdsToText,
-              (const std::vector<int>& token_ids), (override));
-  MOCK_METHOD(absl::StatusOr<int>, TokenToId, (absl::string_view token),
-              (override));
-  MOCK_METHOD(TokenizerType, GetTokenizerType, (), (const, override));
-};
 
 class MockSession : public Engine::Session {
  public:
@@ -222,7 +216,20 @@ TEST(ConversationConfigTest, CreateFromSessionConfig) {
   EXPECT_OK(Conversation::Create(*engine, config));
 }
 
-TEST(ConversationTest, SendMessage) {
+class ConversationTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    auto tokenizer = SentencePieceTokenizer::CreateFromFile(
+        (std::filesystem::path(::testing::SrcDir()) / kTestTokenizerPath)
+            .string());
+    ASSERT_OK(tokenizer);
+    tokenizer_ = std::move(*tokenizer);
+  }
+
+  std::unique_ptr<Tokenizer> tokenizer_;
+};
+
+TEST_F(ConversationTest, SendMessage) {
   ASSERT_OK_AND_ASSIGN(auto model_assets,
                        ModelAssets::Create(GetTestdataPath(kTestLlmPath)));
   ASSERT_OK_AND_ASSIGN(auto engine_settings, EngineSettings::CreateDefault(
@@ -250,7 +257,7 @@ TEST(ConversationTest, SendMessage) {
               testing::ElementsAre(user_message, expected_message));
 }
 
-TEST(ConversationTest, SendSingleMessage) {
+TEST_F(ConversationTest, SendSingleMessage) {
   // Set up mock Session.
   auto mock_session = std::make_unique<MockSession>();
   MockSession* mock_session_ptr = mock_session.get();
@@ -261,9 +268,8 @@ TEST(ConversationTest, SendSingleMessage) {
   session_config.GetMutableJinjaPromptTemplate() = kTestJinjaPromptTemplate;
   EXPECT_CALL(*mock_session_ptr, GetSessionConfig())
       .WillRepeatedly(testing::ReturnRef(session_config));
-  auto mock_tokenizer = std::make_unique<MockTokenizer>();
   EXPECT_CALL(*mock_session_ptr, GetTokenizer())
-      .WillRepeatedly(testing::ReturnRef(*mock_tokenizer));
+      .WillRepeatedly(testing::ReturnRef(*tokenizer_));
 
   // Set up mock Engine.
   auto mock_engine = std::make_unique<MockEngine>();
@@ -315,7 +321,7 @@ TEST(ConversationTest, SendSingleMessage) {
               testing::ElementsAre(user_message, assistant_message));
 }
 
-TEST(ConversationTest, SendMultipleMessages) {
+TEST_F(ConversationTest, SendMultipleMessages) {
   // Set up mock Session.
   auto mock_session = std::make_unique<MockSession>();
   MockSession* mock_session_ptr = mock_session.get();
@@ -326,9 +332,8 @@ TEST(ConversationTest, SendMultipleMessages) {
   session_config.GetMutableJinjaPromptTemplate() = kTestJinjaPromptTemplate;
   EXPECT_CALL(*mock_session_ptr, GetSessionConfig())
       .WillRepeatedly(testing::ReturnRef(session_config));
-  auto mock_tokenizer = std::make_unique<MockTokenizer>();
   EXPECT_CALL(*mock_session_ptr, GetTokenizer())
-      .WillRepeatedly(testing::ReturnRef(*mock_tokenizer));
+      .WillRepeatedly(testing::ReturnRef(*tokenizer_));
 
   // Set up mock Engine.
   auto mock_engine = std::make_unique<MockEngine>();
@@ -394,7 +399,7 @@ TEST(ConversationTest, SendMultipleMessages) {
                                    assistant_message));
 }
 
-TEST(ConversationTest, SendMultipleMessagesWithHistory) {
+TEST_F(ConversationTest, SendMultipleMessagesWithHistory) {
   // Set up mock Session.
   auto mock_session = std::make_unique<MockSession>();
   MockSession* mock_session_ptr = mock_session.get();
@@ -405,9 +410,8 @@ TEST(ConversationTest, SendMultipleMessagesWithHistory) {
   session_config.GetMutableJinjaPromptTemplate() = kTestJinjaPromptTemplate;
   EXPECT_CALL(*mock_session_ptr, GetSessionConfig())
       .WillRepeatedly(testing::ReturnRef(session_config));
-  auto mock_tokenizer = std::make_unique<MockTokenizer>();
   EXPECT_CALL(*mock_session_ptr, GetTokenizer())
-      .WillRepeatedly(testing::ReturnRef(*mock_tokenizer));
+      .WillRepeatedly(testing::ReturnRef(*tokenizer_));
 
   // Set up mock Engine.
   auto mock_engine = std::make_unique<MockEngine>();
@@ -502,7 +506,7 @@ TEST(ConversationTest, SendMultipleMessagesWithHistory) {
                                    assistant_message_2));
 }
 
-TEST(ConversationTest, SendMessageAsync) {
+TEST_F(ConversationTest, SendMessageAsync) {
   ASSERT_OK_AND_ASSIGN(auto model_assets,
                        ModelAssets::Create(GetTestdataPath(kTestLlmPath)));
   ASSERT_OK_AND_ASSIGN(auto engine_settings, EngineSettings::CreateDefault(
@@ -534,7 +538,7 @@ TEST(ConversationTest, SendMessageAsync) {
               testing::ElementsAre(user_message, expected_message_for_confirm));
 }
 
-TEST(ConversationTest, SendSingleMessageAsync) {
+TEST_F(ConversationTest, SendSingleMessageAsync) {
   // Set up mock Session.
   auto mock_session = std::make_unique<MockSession>();
   MockSession* mock_session_ptr = mock_session.get();
@@ -545,9 +549,8 @@ TEST(ConversationTest, SendSingleMessageAsync) {
   session_config.GetMutableJinjaPromptTemplate() = kTestJinjaPromptTemplate;
   EXPECT_CALL(*mock_session_ptr, GetSessionConfig())
       .WillRepeatedly(testing::ReturnRef(session_config));
-  auto mock_tokenizer = std::make_unique<MockTokenizer>();
   EXPECT_CALL(*mock_session_ptr, GetTokenizer())
-      .WillRepeatedly(testing::ReturnRef(*mock_tokenizer));
+      .WillRepeatedly(testing::ReturnRef(*tokenizer_));
 
   // Set up mock Engine.
   auto mock_engine = std::make_unique<MockEngine>();
@@ -609,7 +612,7 @@ TEST(ConversationTest, SendSingleMessageAsync) {
       testing::ElementsAre(user_message, assistant_message_for_confirm));
 }
 
-TEST(ConversationTest, SendMultipleMessagesAsync) {
+TEST_F(ConversationTest, SendMultipleMessagesAsync) {
   // Set up mock Session.
   auto mock_session = std::make_unique<MockSession>();
   MockSession* mock_session_ptr = mock_session.get();
@@ -620,9 +623,8 @@ TEST(ConversationTest, SendMultipleMessagesAsync) {
   session_config.GetMutableJinjaPromptTemplate() = kTestJinjaPromptTemplate;
   EXPECT_CALL(*mock_session_ptr, GetSessionConfig())
       .WillRepeatedly(testing::ReturnRef(session_config));
-  auto mock_tokenizer = std::make_unique<MockTokenizer>();
   EXPECT_CALL(*mock_session_ptr, GetTokenizer())
-      .WillRepeatedly(testing::ReturnRef(*mock_tokenizer));
+      .WillRepeatedly(testing::ReturnRef(*tokenizer_));
 
   // Set up mock Engine.
   auto mock_engine = std::make_unique<MockEngine>();
@@ -697,7 +699,7 @@ TEST(ConversationTest, SendMultipleMessagesAsync) {
                                    assistant_message_for_confirm));
 }
 
-TEST(ConversationTest, SendMultipleMessagesAsyncWithHistory) {
+TEST_F(ConversationTest, SendMultipleMessagesAsyncWithHistory) {
   // Set up mock Session.
   auto mock_session = std::make_unique<MockSession>();
   MockSession* mock_session_ptr = mock_session.get();
@@ -708,9 +710,8 @@ TEST(ConversationTest, SendMultipleMessagesAsyncWithHistory) {
   session_config.GetMutableJinjaPromptTemplate() = kTestJinjaPromptTemplate;
   EXPECT_CALL(*mock_session_ptr, GetSessionConfig())
       .WillRepeatedly(testing::ReturnRef(session_config));
-  auto mock_tokenizer = std::make_unique<MockTokenizer>();
   EXPECT_CALL(*mock_session_ptr, GetTokenizer())
-      .WillRepeatedly(testing::ReturnRef(*mock_tokenizer));
+      .WillRepeatedly(testing::ReturnRef(*tokenizer_));
 
   // Set up mock Engine.
   auto mock_engine = std::make_unique<MockEngine>();
@@ -826,7 +827,7 @@ TEST(ConversationTest, SendMultipleMessagesAsyncWithHistory) {
                            assistant_message_2_for_confirm));
 }
 
-TEST(ConversationTest, SendMessageWithPreface) {
+TEST_F(ConversationTest, SendMessageWithPreface) {
   ASSERT_OK_AND_ASSIGN(auto model_assets,
                        ModelAssets::Create(GetTestdataPath(kTestLlmPath)));
   ASSERT_OK_AND_ASSIGN(auto engine_settings, EngineSettings::CreateDefault(
@@ -853,12 +854,12 @@ TEST(ConversationTest, SendMessageWithPreface) {
       {"role", "assistant"},
       {"content",
        {{{"type", "text"},
-         {"text", " noses</caption> গ্রাহ<unused5297> ompWr"}}}}};
+         {"text", " noses</caption> গ্রাহ<unused5296> ompWr"}}}}};
   const JsonMessage& json_message = std::get<JsonMessage>(message);
   EXPECT_EQ(json_message, expected_message);
 }
 
-TEST(ConversationTest, GetBenchmarkInfo) {
+TEST_F(ConversationTest, GetBenchmarkInfo) {
   ASSERT_OK_AND_ASSIGN(auto model_assets,
                        ModelAssets::Create(GetTestdataPath(kTestLlmPath)));
   ASSERT_OK_AND_ASSIGN(auto engine_settings, EngineSettings::CreateDefault(

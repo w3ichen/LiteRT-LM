@@ -18,6 +18,7 @@
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 #include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
@@ -150,12 +151,15 @@ absl::StatusOr<DataProcessorConfig> CreateDataProcessorConfigFromLlmModelType(
 }
 
 absl::StatusOr<std::unique_ptr<ModelDataProcessor>> CreateModelDataProcessor(
-    const DataProcessorConfig& config, const Tokenizer& tokenizer,
-    std::optional<Preface> preface) {
+    const DataProcessorConfig& config, std::optional<Preface> preface,
+    const Tokenizer* tokenizer,
+    const std::vector<std::vector<int>>& stop_token_ids,
+    bool enable_constrained_decoding) {
   if (std::holds_alternative<Gemma3DataProcessorConfig>(config)) {
     ABSL_LOG(INFO) << "Creating Gemma3DataProcessor";
     return Gemma3DataProcessor::Create(
-        std::get<Gemma3DataProcessorConfig>(config), preface);
+        std::get<Gemma3DataProcessorConfig>(config), preface, tokenizer,
+        stop_token_ids, enable_constrained_decoding);
   } else if (std::holds_alternative<Qwen3DataProcessorConfig>(config)) {
     ABSL_LOG(INFO) << "Creating Qwen3DataProcessor";
     return Qwen3DataProcessor::Create(
