@@ -222,6 +222,7 @@ cc_binary(
         "//conditions:default": [],
     }),
     deps = [
+        ":io_types",
         ":litert_lm_lib",
         ":shared_flags",
         "@com_google_absl//absl/base:log_severity",
@@ -233,9 +234,15 @@ cc_binary(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:string_view",
         "@litert//litert/c/internal:litert_logging",
         "//runtime/util:litert_status_util",
-    ],
+    ] + select({
+        "@platforms//os:windows": [
+        ],
+        "//conditions:default": [
+        ],
+    }),
 )
 
 cc_library(

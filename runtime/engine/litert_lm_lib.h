@@ -83,6 +83,7 @@ struct LiteRtLmSettings {
   bool disable_cache = false;
 };
 
+// Runs the LLM inference with the given settings.
 absl::Status RunLiteRtLm(const LiteRtLmSettings& settings);
 
 }  // namespace lm
