@@ -255,6 +255,31 @@ class LitertlmBuilderTest(parameterized.TestCase):
           additional_metadata=additional_metadata,
       )
 
+  def test_add_tflite_weights(self):
+    """Tests that a TFLite weights file can be added correctly."""
+    tflite_weights_path = self._create_dummy_file(
+        "model.weights", b"dummy tflite weights content"
+    )
+
+    builder = litertlm_builder.LitertLmFileBuilder()
+    self._add_system_metadata(builder)
+    builder.add_tflite_weights(
+        tflite_weights_path,
+        litertlm_builder.TfLiteModelType.PREFILL_DECODE,
+        additional_metadata=[
+            litertlm_builder.Metadata(
+                key="test_key",
+                value="test_value",
+                dtype=litertlm_builder.DType.STRING,
+            )
+        ],
+    )
+    ss = self._build_and_read_litertlm(builder)
+    self.assertIn("Sections (1)", ss)
+    self.assertIn("Data Type:    TFLiteWeights", ss)
+    self.assertIn("Key: model_type, Value (String): tf_lite_prefill_decode", ss)
+    self.assertIn("Key: test_key, Value (String): test_value", ss)
+
   def test_add_sentencepiece_tokenizer(self):
     """Tests that a SentencePiece tokenizer can be added correctly."""
     sp_path = self._create_dummy_file("sp.model", b"dummy sp content")

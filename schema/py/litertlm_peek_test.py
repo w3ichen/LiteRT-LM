@@ -13,6 +13,9 @@
 
 import io
 import os
+import shutil
+import tempfile
+from unittest import mock
 
 from absl.testing import absltest
 
@@ -133,6 +136,57 @@ class LitertlmPeekPyTest(absltest.TestCase):
     self.assertTrue(
         os.path.exists(os.path.join(dump_dir, "LlmMetadataProto.pbtext"))
     )
+
+
+class LitertlmPeekUtilTest(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.temp_dir = tempfile.mkdtemp()
+
+  def tearDown(self):
+    shutil.rmtree(self.temp_dir)
+    super().tearDown()
+
+  def _create_mock_section(self, items):
+    mock_section = mock.Mock()
+    mock_section.ItemsLength.return_value = len(items)
+    mock_section.Items.side_effect = items
+    mock_section.BeginOffset.return_value = 0
+    mock_section.EndOffset.return_value = 10  # Dummy size
+    return mock_section
+
+  def test_get_tflite_weight_filename_with_type(self):
+    with mock.patch.object(
+        litertlm_peek, "_get_model_type", return_value="decoder"
+    ):
+      filename = litertlm_peek._get_tflite_weight_filename(mock.Mock(), 0)
+      self.assertEqual(filename, "Section0_TFLiteWeights_decoder.weight")
+
+  def test_get_tflite_weight_filename_without_type(self):
+    with mock.patch.object(litertlm_peek, "_get_model_type", return_value=None):
+      filename = litertlm_peek._get_tflite_weight_filename(mock.Mock(), 1)
+      self.assertEqual(filename, "Section1_TFLiteWeights.weight")
+
+  def test_dump_tflite_weight(self):
+    mock_section = self._create_mock_section([])
+    mock_stream = io.BytesIO(b"0123456789")
+    mock_output = io.StringIO()
+    file_content = b"0123456789"
+    with mock.patch.object(
+        litertlm_peek,
+        "_get_tflite_weight_filename",
+        return_value="model.weight",
+    ) as mock_get_name:
+      litertlm_peek._dump_tflite_weight(
+          mock_stream, mock_section, 0, self.temp_dir, mock_output
+      )
+      mock_get_name.assert_called_once()
+      file_path = os.path.join(self.temp_dir, "model.weight")
+      self.assertTrue(os.path.exists(file_path))
+      with open(file_path, "rb") as f:
+        self.assertEqual(f.read(), file_content)
+      self.assertIn("model.weight dumped to", mock_output.getvalue())
 
 
 if __name__ == "__main__":

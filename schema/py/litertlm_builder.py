@@ -188,6 +188,9 @@ class LitertLmFileBuilder:
 
     Returns:
       The LitertLmFileBuilder object.
+
+    Raises:
+      ValueError: If the TOML string is invalid.
     """
     builder = cls()
     toml_data = tomllib.loads(toml_str)
@@ -232,9 +235,8 @@ class LitertLmFileBuilder:
               additional_metadata=additional_metadata,
           )
         elif section["section_type"] == "TFLiteModel":
-          assert (
-              "model_type" in section
-          ), "TFLiteModel section does not have model_type."
+          if "model_type" not in section:
+            raise ValueError("TFLiteModel section does not have model_type.")
           model_type = TfLiteModelType.get_enum_from_tf_free_value(
               section["model_type"]
           )
@@ -242,6 +244,17 @@ class LitertLmFileBuilder:
               _resolve_path(section["data_path"], parent_dir),
               model_type,
               backend_constraint=section.get("backend_constraint", None),
+              additional_metadata=additional_metadata,
+          )
+        elif section["section_type"] == "TFLiteWeights":
+          if "model_type" not in section:
+            raise ValueError("TFLiteWeights section does not have model_type.")
+          model_type = TfLiteModelType.get_enum_from_tf_free_value(
+              section["model_type"]
+          )
+          builder.add_tflite_weights(
+              _resolve_path(section["data_path"], parent_dir),
+              model_type,
               additional_metadata=additional_metadata,
           )
         elif section["section_type"] == "SP_Tokenizer":
@@ -382,6 +395,51 @@ class LitertLmFileBuilder:
     section_object = _SectionObject(
         metadata=metadata,
         data_type=schema.AnySectionDataType.TFLiteModel,
+        data_reader=data_reader,
+    )
+    self._sections.append(section_object)
+    return self
+
+  def add_tflite_weights(
+      self,
+      tflite_weights_path: str,
+      model_type: TfLiteModelType,
+      additional_metadata: Optional[list[Metadata]] = None,
+  ) -> LitertLmFileBuilderT:
+    """Adds tflite weights to the litertlm file.
+
+    Args:
+      tflite_weights_path: The path to the tflite weights file.
+      model_type: The type of the tflite model these weights correspond to.
+      additional_metadata: Additional metadata to add to the tflite weights.
+
+    Returns:
+      The current LitertLmFileBuilder object.
+
+    Raises:
+      FileNotFoundError: If the tflite weights file is not found.
+      ValueError: If the model type metadata is overridden.
+    """
+    if not litertlm_core.path_exists(tflite_weights_path):
+      raise FileNotFoundError(
+          f"Tflite weights file not found: {tflite_weights_path}"
+      )
+    metadata = [
+        Metadata(key="model_type", value=model_type.value, dtype=DType.STRING)
+    ]
+    if additional_metadata is not None:
+      for metadata_item in additional_metadata:
+        if metadata_item.key == "model_type":
+          raise ValueError("Model type metadata cannot be overridden.")
+      metadata.extend(additional_metadata)
+
+    def data_reader():
+      with litertlm_core.open_file(tflite_weights_path, "rb") as f:
+        return f.read()
+
+    section_object = _SectionObject(
+        metadata=metadata,
+        data_type=schema.AnySectionDataType.TFLiteWeights,
         data_reader=data_reader,
     )
     self._sections.append(section_object)

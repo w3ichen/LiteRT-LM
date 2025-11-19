@@ -20,7 +20,7 @@ from litert_lm.schema.core import litertlm_header_schema_py_generated as schema
 
 # --- File Format Constants ---
 LITERTLM_MAJOR_VERSION = 1
-LITERTLM_MINOR_VERSION = 4
+LITERTLM_MINOR_VERSION = 5
 LITERTLM_PATCH_VERSION = 0
 BLOCK_SIZE = 16 * 1024
 HEADER_BEGIN_BYTE_OFFSET = 32

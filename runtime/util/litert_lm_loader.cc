@@ -116,7 +116,8 @@ absl::Status LitertLmLoader::Initialize() {
     auto items = section->items();
     BufferKey buffer_key(section->data_type());
     // Extract the specific model type from the section items KeyValuePairs.
-    if (section->data_type() == schema::AnySectionDataType_TFLiteModel) {
+    if (section->data_type() == schema::AnySectionDataType_TFLiteModel ||
+        section->data_type() == schema::AnySectionDataType_TFLiteWeights) {
       bool found_model_type = false;
       std::string model_type;
       std::string backend_constraint;

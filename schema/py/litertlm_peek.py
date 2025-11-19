@@ -166,11 +166,8 @@ def read_litertlm_header(
     return metadata
 
 
-def _get_tflite_model_filename(
-    section_object: schema.SectionObject, section_index: int
-) -> str:
-  """Constructs a filename for a TFLiteModel section based on the model type."""
-  model_type = None
+def _get_model_type(section_object: schema.SectionObject) -> Optional[str]:
+  """Extracts model_type from section items."""
   for j in range(section_object.ItemsLength()):
     item = section_object.Items(j)
     if item is None:
@@ -190,12 +187,30 @@ def _get_tflite_model_filename(
       value_obj = schema.StringValue()
       value_obj.Init(union_table.Bytes, union_table.Pos)
       value_bytes = value_obj.Value()
-      model_type = value_bytes.decode("utf-8") if value_bytes else None
-      break
+      return value_bytes.decode("utf-8") if value_bytes else None
+  return None
+
+
+def _get_tflite_model_filename(
+    section_object: schema.SectionObject, section_index: int
+) -> str:
+  """Constructs a filename for a TFLiteModel section."""
+  model_type = _get_model_type(section_object)
   file_name = f"Section{section_index}_TFLiteModel"
   if model_type:
     file_name += f"_{model_type}"
   return f"{file_name}.tflite"
+
+
+def _get_tflite_weight_filename(
+    section_object: schema.SectionObject, section_index: int
+) -> str:
+  """Constructs a filename for a TFLite weight section."""
+  model_type = _get_model_type(section_object)
+  file_name = f"Section{section_index}_TFLiteWeights"
+  if model_type:
+    file_name += f"_{model_type}"
+  return f"{file_name}.weight"
 
 
 def _dump_llm_metadata_proto(
@@ -226,16 +241,17 @@ def _dump_llm_metadata_proto(
     )
 
 
-def _dump_tflite_model(
+def _dump_section_content(
     file_stream: IO[bytes],
     section_object: schema.SectionObject,
     section_index: int,
     dump_files_dir: Optional[str],
     output_stream: IO[str],
+    get_filename_fn,
 ) -> None:
-  """Dumps TFLiteModel section content."""
+  """Helper to dump section content to a file."""
   if dump_files_dir:
-    file_name = _get_tflite_model_filename(section_object, section_index)
+    file_name = get_filename_fn(section_object, section_index)
     file_path = os.path.join(dump_files_dir, file_name)
     file_stream.seek(section_object.BeginOffset())
     with litertlm_core.open_file(file_path, "wb") as f_out:
@@ -247,6 +263,42 @@ def _dump_tflite_model(
     output_stream.write(
         f"{' ' * INDENT_SPACES}{file_name} dumped to: {file_path}\n"
     )
+
+
+def _dump_tflite_model(
+    file_stream: IO[bytes],
+    section_object: schema.SectionObject,
+    section_index: int,
+    dump_files_dir: Optional[str],
+    output_stream: IO[str],
+) -> None:
+  """Dumps TFLiteModel section content."""
+  _dump_section_content(
+      file_stream,
+      section_object,
+      section_index,
+      dump_files_dir,
+      output_stream,
+      _get_tflite_model_filename,
+  )
+
+
+def _dump_tflite_weight(
+    file_stream: IO[bytes],
+    section_object: schema.SectionObject,
+    section_index: int,
+    dump_files_dir: Optional[str],
+    output_stream: IO[str],
+) -> None:
+  """Dumps TFLite weight section content."""
+  _dump_section_content(
+      file_stream,
+      section_object,
+      section_index,
+      dump_files_dir,
+      output_stream,
+      _get_tflite_weight_filename,
+  )
 
 
 def _get_generic_section_file_extension(data_type_str: str) -> str:
@@ -358,6 +410,10 @@ def peek_litertlm_file(
           )
         elif data_type == schema.AnySectionDataType.TFLiteModel:
           _dump_tflite_model(
+              file_stream, section_object, i, dump_files_dir, output_stream
+          )
+        elif data_type == schema.AnySectionDataType.TFLiteWeights:
+          _dump_tflite_weight(
               file_stream, section_object, i, dump_files_dir, output_stream
           )
         else:

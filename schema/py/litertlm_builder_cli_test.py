@@ -165,6 +165,33 @@ class LiteRTLMBuilderCLITest(absltest.TestCase):
     self.assertIn("Key: model_version, Value (String): 1.0.1", ss)
     self.assertIn("Key: backend_constraint, Value (String): cpu", ss)
 
+  def test_tflite_weights(self):
+    """Tests that TFLite weights can be added correctly via CLI."""
+    tflite_path = self._create_placeholder_file(
+        "model.weights", b"dummy tflite weights content"
+    )
+    args = [
+        "system_metadata",
+        "--int",
+        "my_key",
+        "23",
+        "tflite_weights",
+        "--path",
+        tflite_path,
+        "--model_type",
+        "prefill_decode",
+        "--str_metadata",
+        "weights_version",
+        "1.0.1",
+    ]
+    output_path = self._run_command(*args)
+    self.assertTrue(os.path.exists(output_path))
+    ss = self._peek_litertlm_file(output_path)
+    self.assertIn("Sections (1)", ss)
+    self.assertIn("Data Type:    TFLiteWeights", ss)
+    self.assertIn("Key: model_type, Value (String): tf_lite_prefill_decode", ss)
+    self.assertIn("Key: weights_version, Value (String): 1.0.1", ss)
+
   def test_sp_tokenizer(self):
     """Tests that a SentencePiece tokenizer can be added correctly."""
     sp_path = self._create_placeholder_file("sp.model", b"dummy sp content")

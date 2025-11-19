@@ -89,6 +89,7 @@ _SUBCOMMANDS = (
     "system_metadata",
     "llm_metadata",
     "tflite_model",
+    "tflite_weights",
     "sp_tokenizer",
     "hf_tokenizer",
     "output",
@@ -211,6 +212,32 @@ def _add_tflite_model_parser(subparsers) -> None:
   _add_metadata_arguments(tflite_model_parser)
 
 
+def _add_tflite_weights_parser(subparsers) -> None:
+  """Adds a parser for tflite weights to the subparsers."""
+  tflite_weights_parser = subparsers.add_parser(
+      "tflite_weights",
+      description="Add tflite weights to the LiteRT-LM file.",
+      help="Add tflite weights.",
+  )
+  tflite_weights_parser.add_argument(
+      "--path",
+      type=str,
+      required=True,
+      help="The path to the tflite weights file.",
+  )
+  tflite_weights_parser.add_argument(
+      "--model_type",
+      type=str,
+      required=True,
+      choices=[
+          str(model_type.value).lower().replace("tf_lite_", "")
+          for model_type in litertlm_builder.TfLiteModelType
+      ],
+      help="The type of the tflite model these weights correspond to.",
+  )
+  _add_metadata_arguments(tflite_weights_parser)
+
+
 def _add_sentencepiece_tokenizer_parser(subparsers) -> None:
   """Adds a parser for sentencepiece tokenizer to the subparsers."""
   sp_tokenizer_parser = subparsers.add_parser(
@@ -268,6 +295,7 @@ def _build_parser() -> argparse.ArgumentParser:
   _add_system_metadata_parser(subparsers)
   _add_llm_metadata_parser(subparsers)
   _add_tflite_model_parser(subparsers)
+  _add_tflite_weights_parser(subparsers)
   _add_sentencepiece_tokenizer_parser(subparsers)
   _add_hf_tokenizer_parser(subparsers)
   _add_output_path_parser(subparsers)
@@ -392,6 +420,21 @@ def _build_tflite_model(
   )
 
 
+def _build_tflite_weights(
+    args: argparse.Namespace,
+    builder: litertlm_builder.LitertLmFileBuilder,
+) -> None:
+  """Builds tflite weights from the parsed arguments."""
+  metadata = _get_metadata_from_args(args)
+  builder.add_tflite_weights(
+      args.path,
+      litertlm_builder.TfLiteModelType.get_enum_from_tf_free_value(
+          args.model_type
+      ),
+      additional_metadata=metadata,
+  )
+
+
 def _build_sp_tokenizer(
     args: argparse.Namespace,
     builder: litertlm_builder.LitertLmFileBuilder,
@@ -441,6 +484,8 @@ def _build_litertlm_file(parsed_args: list[argparse.Namespace]) -> None:
           _build_llm_metadata(parsed_arg, builder)
         case "tflite_model":
           _build_tflite_model(parsed_arg, builder)
+        case "tflite_weights":
+          _build_tflite_weights(parsed_arg, builder)
         case "sp_tokenizer":
           _build_sp_tokenizer(parsed_arg, builder)
         case "hf_tokenizer":

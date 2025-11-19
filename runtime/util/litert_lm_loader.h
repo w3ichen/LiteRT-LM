@@ -37,23 +37,25 @@
 namespace litert::lm {
 
 // Each buffer is keyed by the data type as the major key and the model type
-// as the optional secondary key when the data type is TFLITE_MODEL_DATA.
+// as the optional secondary key when the data type is TFLiteModel or
+// TFLiteWeights.
 struct BufferKey {
   schema::AnySectionDataType data_type;
-  std::optional<ModelType> model_type;  // This can be nullopt for data types
-                                        // other than TFLITE_MODEL_DATA!
+  std::optional<ModelType>
+      model_type;  // This can be nullopt for data types
+                   // other than TFLiteModel or TFLiteWeights!
 
   // Constructor for common cases (no ModelType needed)
   explicit BufferKey(schema::AnySectionDataType type)
       : data_type(type), model_type(std::nullopt) {}
 
-  // Constructor for TFLITE_MODEL_DATA case
+  // Constructor for TFLiteModel or TFLiteWeights case
   explicit BufferKey(schema::AnySectionDataType type, ModelType model_type)
       : data_type(type), model_type(model_type) {
-    // Optional: Add an assertion here if 'type' MUST be TFLITE_MODEL_DATA for
-    // model_t to be set
-    ABSL_CHECK(type == schema::AnySectionDataType_TFLiteModel &&
-               "ModelType should only be provided for TFLITE_MODEL_DATA");
+    ABSL_CHECK(
+        (type == schema::AnySectionDataType_TFLiteModel ||
+         type == schema::AnySectionDataType_TFLiteWeights) &&
+        "ModelType should only be provided for TFLiteModel or TFLiteWeights");
   }
 
   // Equality operator (REQUIRED for std::unordered_map, good for std::map)
@@ -104,7 +106,20 @@ class LitertLmLoader {
     if (optional_section_buffer.has_value()) {
       return optional_section_buffer.value();
     }
-    ABSL_LOG(WARNING) << "TFLite model type: " << ModelTypeToString(model_type)
+    ABSL_LOG(WARNING) << "TFLite model for type: "
+                      << ModelTypeToString(model_type)
+                      << " not found. Skipping.";
+    return litert::BufferRef<uint8_t>();
+  };
+
+  litert::BufferRef<uint8_t> GetTFLiteWeights(ModelType model_type) {
+    auto optional_section_buffer = GetSectionBuffer(
+        BufferKey(schema::AnySectionDataType_TFLiteWeights, model_type));
+    if (optional_section_buffer.has_value()) {
+      return optional_section_buffer.value();
+    }
+    ABSL_LOG(WARNING) << "TFLite weights for type: "
+                      << ModelTypeToString(model_type)
                       << " not found. Skipping.";
     return litert::BufferRef<uint8_t>();
   };
