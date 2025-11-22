@@ -140,6 +140,7 @@ cc_test(
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:string_view",
+        "//runtime/executor:executor_settings_base",
         "//runtime/executor:llm_executor_settings",
     ],
 )
@@ -418,6 +419,7 @@ cc_library(
     srcs = ["litert_lm_loader.cc"],
     hdrs = ["litert_lm_loader.h"],
     deps = [
+        ":litert_status_util",
         ":memory_mapped_file",
         ":scoped_file",
         "@com_google_absl//absl/log:absl_check",
@@ -428,7 +430,6 @@ cc_library(
         "@com_google_absl//absl/strings:string_view",
         "@litert//litert/cc:litert_buffer_ref",
         "//runtime/components:model_resources",
-        "//runtime/util:litert_status_util",
         "//schema/core:litertlm_header_schema",
         "//schema/core:litertlm_read",
     ],

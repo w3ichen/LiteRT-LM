@@ -34,6 +34,7 @@
 #include "litert/test/matchers.h"  // from @litert
 #include "runtime/components/model_resources.h"
 #include "runtime/executor/executor_settings_base.h"
+#include "runtime/util/memory_mapped_file.h"
 #include "runtime/util/scoped_file.h"
 #include "runtime/util/test_utils.h"  // IWYU pragma: keep
 
@@ -464,6 +465,39 @@ TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
 
   auto model_assets =
       ModelAssets::Create(std::make_shared<ScopedFile>(std::move(model_file)));
+  ASSERT_OK(model_assets);
+
+  ASSERT_OK_AND_ASSIGN(auto model_resources,
+                       BuildLiteRtCompiledModelResources(*model_assets));
+  ASSERT_NE(model_resources, nullptr);
+  ASSERT_OK(model_resources->GetTFLiteModel(ModelType::kTfLitePrefillDecode));
+}
+
+TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
+     BuildModelResourcesTaskBundleFromMmapFile) {
+  auto model_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/test_lm.task";
+  ASSERT_OK_AND_ASSIGN(auto mmap_file,
+                       MemoryMappedFile::Create(model_path.string()));
+  auto model_assets = ModelAssets::Create(std::move(mmap_file));
+  ASSERT_OK(model_assets);
+
+  ASSERT_OK_AND_ASSIGN(auto model_resources,
+                       BuildLiteRtCompiledModelResources(*model_assets));
+  ASSERT_NE(model_resources, nullptr);
+  ASSERT_OK(model_resources->GetTFLiteModel(ModelType::kTfLitePrefillDecode));
+}
+
+TEST(LlmLiteRTCompiledModelExecutorUtilsTest,
+     BuildModelResourcesLitertLmFromMmapFile) {
+  auto model_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/test_lm.litertlm";
+
+  ASSERT_OK_AND_ASSIGN(auto mmap_file,
+                       MemoryMappedFile::Create(model_path.string()));
+  auto model_assets = ModelAssets::Create(std::move(mmap_file));
   ASSERT_OK(model_assets);
 
   ASSERT_OK_AND_ASSIGN(auto model_resources,

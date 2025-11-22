@@ -15,10 +15,13 @@
 #include "runtime/util/litert_lm_loader.h"
 
 #include <filesystem>  // NOLINT: Required for path manipulation.
+#include <memory>
 #include <utility>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "runtime/components/model_resources.h"
+#include "runtime/util/memory_mapped_file.h"
 #include "runtime/util/scoped_file.h"
 
 namespace litert::lm {
@@ -49,6 +52,20 @@ TEST(LitertLmLoaderTest, InitializeWithHuggingFaceFile) {
   LitertLmLoader loader(std::move(model_file.value()));
   ASSERT_GT(loader.GetHuggingFaceTokenizer()->Size(), 0);
   ASSERT_FALSE(loader.GetSentencePieceTokenizer());
+}
+
+TEST(LitertLmLoaderTest, InitializeWithMemoryMappedFile) {
+  const auto model_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/test_lm.litertlm";
+  ASSERT_OK_AND_ASSIGN(std::unique_ptr<MemoryMappedFile> mapped_file,
+                       MemoryMappedFile::Create(model_path.string()));
+  LitertLmLoader loader(std::move(mapped_file));
+  EXPECT_FALSE(loader.GetHuggingFaceTokenizer());
+  EXPECT_GT(loader.GetSentencePieceTokenizer()->Size(), 0);
+  EXPECT_GT(loader.GetTFLiteModel(ModelType::kTfLitePrefillDecode).Size(), 0);
+  EXPECT_GT(loader.GetLlmMetadata().Size(), 0);
+  EXPECT_EQ(loader.GetTFLiteModel(ModelType::kTfLiteEmbedder).Size(), 0);
 }
 
 }  // namespace

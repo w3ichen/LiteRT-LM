@@ -40,6 +40,11 @@ absl::StatusOr<FileFormat> GetFileFormat(
     absl::string_view model_path,
     std::shared_ptr<ScopedFile> scoped_file = nullptr);
 
+// Infer the file format from the model assets. This will first try to infer the
+// format from the memory mapped file contents, and if that fails, will attempt
+// to infer the format from the file path.
+absl::StatusOr<FileFormat> GetFileFormat(const ModelAssets& model_assets);
+
 }  // namespace litert::lm
 
 #endif  // THIRD_PARTY_ODML_LITERT_LM_RUNTIME_UTIL_FILE_FORMAT_UTIL_H_

@@ -25,7 +25,6 @@
 #include <vector>
 
 #include "absl/algorithm/container.h"  // from @com_google_absl
-#include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "absl/strings/match.h"  // from @com_google_absl
@@ -42,7 +41,6 @@
 #include "runtime/util/file_format_util.h"
 #include "runtime/util/litert_lm_loader.h"
 #include "runtime/util/model_asset_bundle_resources.h"
-#include "runtime/util/scoped_file.h"
 #include "runtime/util/status_macros.h"  //NOLINT
 
 namespace litert::lm {
@@ -69,12 +67,19 @@ constexpr std::array<absl::string_view, 1> kPerLayerEmbeddingNames = {
 constexpr std::array<absl::string_view, 1> kOutputLogitsNames = {"logits"};
 
 absl::StatusOr<std::unique_ptr<ModelResources>>
-BuildModelResourcesFromTaskFormat(std::shared_ptr<ScopedFile> model_file) {
-  ASSIGN_OR_RETURN(auto resources,  // NOLINT
-                   ModelAssetBundleResources::Create(/*tag=*/"", model_file));
-
+BuildModelResourcesFromTaskFormat(const ModelAssets& model_assets) {
+  std::unique_ptr<ModelAssetBundleResources> resources;
+  if (model_assets.HasMemoryMappedFile()) {
+    ASSIGN_OR_RETURN(
+        resources, ModelAssetBundleResources::Create(
+                       /*tag=*/"", model_assets.GetMemoryMappedFile().value()));
+  } else {
+    ASSIGN_OR_RETURN(auto scoped_file, model_assets.GetOrCreateScopedFile());
+    ASSIGN_OR_RETURN(resources, ModelAssetBundleResources::Create(
+                                    /*tag=*/"", scoped_file));
+  }
   auto files_list = resources->ListFiles();
-  RET_CHECK(std::find(files_list.begin(), files_list.end(),  // NOLINT
+  RET_CHECK(std::find(files_list.begin(), files_list.end(),
                       kPrefilDecodeModelNameInTaskBundle) != files_list.end())
       << kPrefilDecodeModelNameInTaskBundle
       << " model file not found in task bundle.";
@@ -82,12 +87,19 @@ BuildModelResourcesFromTaskFormat(std::shared_ptr<ScopedFile> model_file) {
 }
 
 absl::StatusOr<std::unique_ptr<ModelResources>>
-BuildModelResourcesFromLitertLmFormat(ScopedFile model_file) {
-  auto loader = std::make_unique<LitertLmLoader>(std::move(model_file));
-
-  ABSL_LOG(INFO) << "Read litert model from section.";
-
-  // Save the loader for future use and keep the model alive.
+BuildModelResourcesFromLitertLmFormat(const ModelAssets& model_assets) {
+  std::unique_ptr<LitertLmLoader> loader;
+  if (model_assets.HasMemoryMappedFile()) {
+    loader = std::make_unique<LitertLmLoader>(
+        model_assets.GetMemoryMappedFile().value());
+  } else {
+    // `BuildModelResourcesFromLitertLmFormat` expects a ScopedFile that it
+    // takes ownership of, so we need to duplicate the ScopedFile to keep
+    // the original alive.
+    ASSIGN_OR_RETURN(auto scoped_file, model_assets.GetOrCreateScopedFile());
+    ASSIGN_OR_RETURN(auto duplicate_file, scoped_file->Duplicate());
+    loader = std::make_unique<LitertLmLoader>(std::move(duplicate_file));
+  }
   return ModelResourcesLitertLm::Create(std::move(loader));
 }
 
@@ -293,26 +305,14 @@ absl::Status FillAttentionMask(litert::TensorBuffer& mask, int start_timestep,
 
 absl::StatusOr<std::unique_ptr<ModelResources>>
 BuildLiteRtCompiledModelResources(const ModelAssets& model_assets) {
-  ASSIGN_OR_RETURN(  // NOLINT
-      auto format,
-      GetFileFormat(model_assets.GetPath().value_or(""),
-                    model_assets.GetScopedFile().value_or(nullptr)));
-
-  ASSIGN_OR_RETURN(auto scoped_file,  // NOLINT
-                   model_assets.GetOrCreateScopedFile());
-
+  ASSIGN_OR_RETURN(auto format, GetFileFormat(model_assets));
   switch (format) {
     case FileFormat::TFLITE:
       return absl::InvalidArgumentError("Unsupported file format.");
     case FileFormat::TASK:
-      return BuildModelResourcesFromTaskFormat(std::move(scoped_file));
-    case FileFormat::LITERT_LM: {
-      // `BuildModelResourcesFromLitertLmFormat` expects a ScopedFile that it
-      // takes ownership of, so we need to duplicate the ScopedFile to keep
-      // the original alive.
-      ASSIGN_OR_RETURN(auto duplicate_file, scoped_file->Duplicate());
-      return BuildModelResourcesFromLitertLmFormat(std::move(duplicate_file));
-    }
+      return BuildModelResourcesFromTaskFormat(model_assets);
+    case FileFormat::LITERT_LM:
+      return BuildModelResourcesFromLitertLmFormat(model_assets);
   }
 }
 

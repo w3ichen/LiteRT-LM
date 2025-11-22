@@ -45,6 +45,14 @@ class ModelAssetBundleResources {
       const std::string& tag,
       std::shared_ptr<ScopedFile> model_asset_bundle_file);
 
+  // Takes a reference to the provided model asset bundle file and creates
+  // ModelAssetBundleResources from its contents. A non-empty tag
+  // must be set if the ModelAssetBundleResources will be used through
+  // ModelResourcesCacheService.
+  static absl::StatusOr<std::unique_ptr<ModelAssetBundleResources>> Create(
+      const std::string& tag,
+      std::shared_ptr<MemoryMappedFile> model_asset_bundle_file);
+
   // Convenience method to create from a ScopedFile directly.
   static absl::StatusOr<std::unique_ptr<ModelAssetBundleResources>> Create(
       const std::string& tag, ScopedFile&& model_asset_bundle_file);
@@ -72,14 +80,14 @@ class ModelAssetBundleResources {
  private:
   ModelAssetBundleResources(
       std::string tag,
-      std::unique_ptr<MemoryMappedFile> mapped_model_asset_bundle_file,
+      std::shared_ptr<MemoryMappedFile> mapped_model_asset_bundle_file,
       absl::flat_hash_map<std::string, OffsetAndSize> files);
 
   // The model asset bundle resources tag.
   const std::string tag_;
 
   // This owns the memory backing `files_`.
-  const std::unique_ptr<MemoryMappedFile> mapped_model_asset_bundle_file_;
+  const std::shared_ptr<MemoryMappedFile> mapped_model_asset_bundle_file_;
 
   // The files bundled in model asset bundle, as a map with the filename
   // (corresponding to a basename, e.g. "hand_detector.tflite") as key and

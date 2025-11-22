@@ -22,8 +22,10 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
+#include "absl/log/absl_check.h"  // from @com_google_absl
 #include "absl/log/absl_log.h"  // from @com_google_absl
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
@@ -62,45 +64,83 @@ constexpr uint64_t kLitertLmHeaderMaxSize = 16 * 1024;
 absl::Status LitertLmLoader::MapSection(BufferKey buffer_key,
                                         uint64_t begin_offset,
                                         uint64_t end_offset) {
-  // If the begin offset is not aligned to the required platform alignment, we
-  // need to map the section starting a bit earlier so that the data is aligned.
-  size_t alignment = MemoryMappedFile::GetOffsetAlignment();
-  uint64_t alignment_gap = begin_offset % alignment;
-  uint64_t aligned_begin_offset = begin_offset - alignment_gap;
+  uint8_t* data = nullptr;
+  if (std::holds_alternative<std::shared_ptr<MemoryMappedFile>>(
+          model_source_)) {
+    // If the loader was initialized with an existing memory-mapped file, the
+    // entire file content is already mapped into memory. We can access any
+    // section by adding its begin_offset to the base pointer of the mapped
+    // region. Unlike mmap offsets, pointer arithmetic within an
+    // already-mapped region does not require page alignment, so no
+    // alignment_gap is needed here.
+    data = static_cast<uint8_t*>(
+               std::get<std::shared_ptr<MemoryMappedFile>>(model_source_)
+                   ->data()) +
+           begin_offset;
+  } else {
+    // If the begin offset is not aligned to the required platform alignment, we
+    // need to map the section starting a bit earlier so that the data is
+    // aligned.
+    auto& model_file = std::get<ScopedFile>(model_source_);
+    size_t alignment = MemoryMappedFile::GetOffsetAlignment();
+    uint64_t alignment_gap = begin_offset % alignment;
+    uint64_t aligned_begin_offset = begin_offset - alignment_gap;
 
-  uint64_t aligned_section_size = end_offset - aligned_begin_offset;
-  ASSIGN_OR_RETURN(
-      section_memory_mapped_files_[buffer_key],
-      CreateMemoryMapFromScopedFile(model_file_, aligned_begin_offset,
-                                    aligned_section_size));
-  auto& memory_mapped_file = section_memory_mapped_files_[buffer_key];
+    uint64_t aligned_section_size = end_offset - aligned_begin_offset;
+    ASSIGN_OR_RETURN(
+        section_memory_mapped_files_[buffer_key],
+        CreateMemoryMapFromScopedFile(model_file, aligned_begin_offset,
+                                      aligned_section_size));
+    auto& memory_mapped_file = section_memory_mapped_files_[buffer_key];
 
-  // The section buffer that is stored should point to the section data only,
-  // not include the alignment gap.
-  uint8_t* data =
-      static_cast<uint8_t*>(memory_mapped_file->data()) + alignment_gap;
+    // The section buffer that is stored should point to the section data only,
+    // not include the alignment gap.
+    data = static_cast<uint8_t*>(memory_mapped_file->data()) + alignment_gap;
+  }
+
   uint64_t section_size = end_offset - begin_offset;
   section_buffers_[buffer_key] = BufferRef<uint8_t>(data, section_size);
 
   return absl::OkStatus();
 }
 
+// This constructor is used when the model file is already loaded into memory.
+LitertLmLoader::LitertLmLoader(
+    std::shared_ptr<MemoryMappedFile> memory_mapped_model_file)
+    : model_source_(std::move(memory_mapped_model_file)) {
+  ABSL_CHECK_OK(Initialize());
+}
+
 absl::Status LitertLmLoader::Initialize() {
   ABSL_LOG(INFO) << "LitertLmLoader::Initialize";
 
   // Map the header of the model file.
-  ASSIGN_OR_RETURN(uint64_t model_file_size, model_file_.GetSize());
-  uint64_t header_size = std::min(kLitertLmHeaderMaxSize, model_file_size);
-  ASSIGN_OR_RETURN(std::unique_ptr<MemoryMappedFile> header_memory_mapped_file,
-                   CreateMemoryMapFromScopedFile(model_file_, /*offset=*/0,
-                                                 /*size=*/header_size));
+  uint64_t model_file_size;
+  uint64_t header_size;
+  void* header_data;
+  std::unique_ptr<MemoryMappedFile> header_memory_mapped_file;
+  if (std::holds_alternative<std::shared_ptr<MemoryMappedFile>>(
+          model_source_)) {
+    auto& memory_mapped_model_file =
+        std::get<std::shared_ptr<MemoryMappedFile>>(model_source_);
+    model_file_size = memory_mapped_model_file->length();
+    header_size = std::min(kLitertLmHeaderMaxSize, model_file_size);
+    header_data = memory_mapped_model_file->data();
+  } else {
+    auto& model_file = std::get<ScopedFile>(model_source_);
+    ASSIGN_OR_RETURN(model_file_size, model_file.GetSize());
+    header_size = std::min(kLitertLmHeaderMaxSize, model_file_size);
+    ASSIGN_OR_RETURN(header_memory_mapped_file,
+                     CreateMemoryMapFromScopedFile(model_file, /*offset=*/0,
+                                                   /*size=*/header_size));
+    header_data = header_memory_mapped_file->data();
+  }
   ABSL_LOG(INFO) << "mmap_status is ok";
-  ABSL_LOG(INFO) << "length: " << header_memory_mapped_file->length();
 
   // Read the header information.
   schema::LitertlmHeader header;
-  absl::Status status = ReadHeaderFromLiteRTLM(
-      header_memory_mapped_file->data(), header_size, &header_);
+  absl::Status status =
+      ReadHeaderFromLiteRTLM(header_data, header_size, &header_);
   ABSL_LOG(INFO) << "status: " << status;
   ABSL_LOG(INFO) << "major_version: " << header_.major_version;
   ABSL_LOG(INFO) << "minor_version: " << header_.minor_version;

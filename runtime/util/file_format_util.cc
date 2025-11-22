@@ -87,4 +87,17 @@ absl::StatusOr<FileFormat> GetFileFormat(
   return absl::InvalidArgumentError("Unsupported or unknown file format.");
 }
 
+absl::StatusOr<FileFormat> GetFileFormat(const ModelAssets& model_assets) {
+  if (model_assets.HasMemoryMappedFile()) {
+    auto mmfile = model_assets.GetMemoryMappedFile().value();
+    absl::string_view header(
+        reinterpret_cast<const char*>(mmfile->data()),
+        std::min((size_t)mmfile->length(), kMaxMagicSignatureLength));
+    return GetFileFormatFromFileContents(header);
+  }
+
+  return GetFileFormat(model_assets.GetPath().value_or(""),
+                       model_assets.GetScopedFile().value_or(nullptr));
+}
+
 }  // namespace litert::lm

@@ -23,7 +23,7 @@
 #include <gtest/gtest.h>
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/strings/string_view.h"  // from @com_google_absl
-#include "runtime/executor/llm_executor_settings.h"
+#include "runtime/executor/executor_settings_base.h"
 #include "runtime/util/memory_mapped_file.h"
 #include "runtime/util/scoped_file.h"
 #include "runtime/util/test_utils.h"  // NOLINT
@@ -104,6 +104,37 @@ TEST(FileFormatUtilTest, FileFormatFromRealFile) {
 
   // From both the path and the scoped file. Should be able to figure it out.
   ASSERT_THAT(GetFileFormat(model_path_str, shared_scoped_file),
+              IsOkAndHolds(FileFormat::LITERT_LM));
+}
+
+TEST(FileFormatUtilTest, FileFormatFromModelAssets) {
+  auto model_path =
+      std::filesystem::path(::testing::SrcDir()) /
+      "litert_lm/runtime/testdata/test_lm.litertlm";
+  std::string model_path_str = model_path.string();
+
+  // 1. ModelAssets with path.
+  ASSERT_OK_AND_ASSIGN(auto model_assets_path,
+                       ModelAssets::Create(model_path_str));
+  ASSERT_THAT(GetFileFormat(model_assets_path),
+              IsOkAndHolds(FileFormat::LITERT_LM));
+
+  // 2. ModelAssets with ScopedFile.
+  ASSERT_OK_AND_ASSIGN(auto scoped_file, ScopedFile::Open(model_path_str));
+  auto shared_scoped_file =
+      std::make_shared<ScopedFile>(std::move(scoped_file));
+  ASSERT_OK_AND_ASSIGN(auto model_assets_sf,
+                       ModelAssets::Create(shared_scoped_file));
+  ASSERT_THAT(GetFileFormat(model_assets_sf),
+              IsOkAndHolds(FileFormat::LITERT_LM));
+
+  // 3. ModelAssets with MemoryMappedFile
+  ASSERT_OK_AND_ASSIGN(auto scoped_file2, ScopedFile::Open(model_path_str));
+  ASSERT_OK_AND_ASSIGN(auto mapped_file,
+                       MemoryMappedFile::Create(scoped_file2.file()));
+  ASSERT_OK_AND_ASSIGN(auto model_assets_mmf,
+                       ModelAssets::Create(std::move(mapped_file)));
+  ASSERT_THAT(GetFileFormat(model_assets_mmf),
               IsOkAndHolds(FileFormat::LITERT_LM));
 }
 

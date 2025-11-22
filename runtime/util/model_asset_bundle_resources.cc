@@ -60,6 +60,26 @@ ModelAssetBundleResources::Create(
 
 // static
 absl::StatusOr<std::unique_ptr<ModelAssetBundleResources>>
+ModelAssetBundleResources::Create(
+    const std::string& tag,
+    std::shared_ptr<MemoryMappedFile> model_asset_bundle_file) {
+  if (!model_asset_bundle_file) {
+    return absl::InvalidArgumentError(
+        "The model asset bundle file is not valid.");
+  }
+
+  absl::string_view data(
+      reinterpret_cast<const char*>(model_asset_bundle_file->data()),
+      model_asset_bundle_file->length());
+
+  ASSIGN_OR_RETURN(auto files, ExtractFilesfromZipFile(data));
+
+  return absl::WrapUnique(new ModelAssetBundleResources(
+      tag, std::move(model_asset_bundle_file), std::move(files)));
+}
+
+// static
+absl::StatusOr<std::unique_ptr<ModelAssetBundleResources>>
 ModelAssetBundleResources::Create(const std::string& tag,
                                   ScopedFile&& model_asset_bundle_file) {
   return Create(
@@ -68,7 +88,7 @@ ModelAssetBundleResources::Create(const std::string& tag,
 
 ModelAssetBundleResources::ModelAssetBundleResources(
     std::string tag,
-    std::unique_ptr<MemoryMappedFile> mapped_model_asset_bundle_file,
+    std::shared_ptr<MemoryMappedFile> mapped_model_asset_bundle_file,
     absl::flat_hash_map<std::string, OffsetAndSize> files)
     : tag_(std::move(tag)),
       mapped_model_asset_bundle_file_(
