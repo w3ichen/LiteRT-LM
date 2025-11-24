@@ -223,9 +223,15 @@ absl::StatusOr<std::unique_ptr<Engine>> Engine::CreateEngine(
                    GetEnvironment(engine_settings, *model_resources));
   const auto& main_executor_settings =
       engine_settings.GetMainExecutorSettings();
-  ASSIGN_OR_RETURN(executor,
-                   CreateLlmLiteRtCompiledModelExecutor(main_executor_settings,
-                                                        env, *model_resources));
+
+  switch (main_executor_settings.GetBackend()) {
+    default: {
+      ASSIGN_OR_RETURN(executor,
+                       CreateLlmLiteRtCompiledModelExecutor(
+                           main_executor_settings, env, *model_resources));
+    }
+  };
+
   // TODO - b/436674053: Modularize the executor creation logic into a
   // separate executor class, and have unit test for it.
   std::unique_ptr<VisionExecutor> vision_executor;
