@@ -498,18 +498,28 @@ double litert_lm_benchmark_info_get_decode_tokens_per_sec_at(
   return benchmark_info->benchmark_info.GetDecodeTokensPerSec(index);
 }
 
-LiteRtLmConversation* litert_lm_conversation_create(LiteRtLmEngine* engine) {
+LiteRtLmConversation* litert_lm_conversation_create(
+    LiteRtLmEngine* engine, LiteRtLmConversationConfig* conversation_config) {
   if (!engine || !engine->engine) {
     return nullptr;
   }
-  auto conversation_config = ConversationConfig::CreateDefault(*engine->engine);
-  if (!conversation_config.ok()) {
-    ABSL_LOG(ERROR) << "Failed to create conversation config: "
-                    << conversation_config.status();
-    return nullptr;
+
+  absl::StatusOr<std::unique_ptr<Conversation>> conversation;
+  if (conversation_config && conversation_config->config) {
+    conversation = Conversation::Create(*engine->engine,
+                                        *conversation_config->config);
+  } else {
+    auto default_conversation_config =
+        ConversationConfig::CreateDefault(*engine->engine);
+    if (!default_conversation_config.ok()) {
+      ABSL_LOG(ERROR) << "Failed to create default conversation config: "
+                      << default_conversation_config.status();
+      return nullptr;
+    }
+    conversation =
+        Conversation::Create(*engine->engine, *default_conversation_config);
   }
-  auto conversation =
-      Conversation::Create(*engine->engine, *conversation_config);
+
   if (!conversation.ok()) {
     ABSL_LOG(ERROR) << "Failed to create conversation: "
                     << conversation.status();

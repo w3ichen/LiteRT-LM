@@ -297,8 +297,11 @@ int litert_lm_session_generate_content_stream(LiteRtLmSession* session,
 // the conversation using `litert_lm_conversation_delete`.
 //
 // @param engine The engine to create the conversation from.
+// @param config The conversation config to use. If NULL, the default config
+//   will be used.
 // @return A pointer to the created conversation, or NULL on failure.
-LiteRtLmConversation* litert_lm_conversation_create(LiteRtLmEngine* engine);
+LiteRtLmConversation* litert_lm_conversation_create(
+    LiteRtLmEngine* engine, LiteRtLmConversationConfig* config);
 
 // Destroys a LiteRT LM Conversation.
 //
