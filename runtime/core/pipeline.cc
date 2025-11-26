@@ -132,9 +132,9 @@ absl::Status DecodeCustomSamplingStreaming(
 absl::StatusOr<Responses> ScoreCustomSampling(
     LlmExecutor& executor, Tokenizer& tokenizer,
     const std::vector<absl::string_view>& target_texts, const float temperature,
-    litert::TensorBuffer decoded_ids) {
+    litert::TensorBuffer decoded_ids, bool store_token_lengths) {
   return Tasks::Score(executor, tokenizer, target_texts, temperature,
-                      std::move(decoded_ids));
+                      std::move(decoded_ids), store_token_lengths);
 }
 
 }  // namespace litert::lm

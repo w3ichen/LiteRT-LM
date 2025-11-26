@@ -120,11 +120,13 @@ absl::Status DecodeCustomSamplingStreaming(
 //   each element corresponding to the target text to score in the batch.
 // - temperature: The temperature to use for softmax calculations.
 // - decoded_ids: The decoded token ids from the external sampling process.
+// - store_token_lengths: Whether to store the token lengths of the target
+//   texts in `Responses`.
 //   The supported shape is [num_output_candidates, 1].
 absl::StatusOr<Responses> ScoreCustomSampling(
     LlmExecutor& executor, Tokenizer& tokenizer,
     const std::vector<absl::string_view>& target_text, float temperature,
-    litert::TensorBuffer decoded_ids);
+    litert::TensorBuffer decoded_ids, bool store_token_lengths = false);
 }  // namespace litert::lm
 
 #endif  // THIRD_PARTY_ODML_LITERT_LM_RUNTIME_ENGINE_PIPELINE_H_

@@ -420,20 +420,53 @@ absl::Status RunMultiTurnConversation(const LiteRtLmSettings& settings,
   return absl::OkStatus();
 }
 
-void RunScoreText(litert::lm::Engine* llm, litert::lm::Engine::Session* session,
-                  std::string& input_prompt, std::string& target_text) {
+absl::StatusOr<std::vector<litert::lm::ScorerOutput>> RunScoreText(
+    litert::lm::Engine* llm, litert::lm::Engine::Session* session,
+    absl::string_view input_prompt,
+    const std::vector<absl::string_view>& target_text_vector,
+    bool store_char_and_token_lengths = false) {
   std::vector<litert::lm::InputData> inputs;
-  inputs.emplace_back(InputText(input_prompt));
-  std::vector<absl::string_view> target_text_vector;
-  target_text_vector.push_back(target_text);
-  ABSL_CHECK_OK(session->RunPrefill(inputs));
-  auto response = session->RunTextScoring(target_text_vector);
-  ABSL_CHECK_OK(response);
-  if (response->GetScores().empty()) {
+  inputs.emplace_back(InputText(std::string(input_prompt)));
+  RETURN_IF_ERROR(session->RunPrefill(inputs));
+  ASSIGN_OR_RETURN(litert::lm::Responses response,
+                   session->RunTextScoring(target_text_vector,
+                                           store_char_and_token_lengths));
+  const std::vector<float>& scores = response.GetScores();
+  if (scores.empty()) {
     ABSL_LOG(WARNING) << "No score found.";
   } else {
-    ABSL_LOG(INFO) << "Score: " << -1 * (response->GetScores()[0]) << std::endl;
+    // Multiply by -1 to get the negative log likelihood.
+    ABSL_LOG(INFO) << "Score: " << -1 * (scores[0]) << std::endl;
   }
+  if (scores.size() != target_text_vector.size()) {
+    return absl::InternalError(absl::StrCat("Scores size ", scores.size(),
+                                            " does not match target text size ",
+                                            target_text_vector.size()));
+  }
+  const std::optional<std::vector<int>>& token_lengths =
+      response.GetTokenLengths();
+  if (store_char_and_token_lengths) {
+    if (!token_lengths.has_value()) {
+      return absl::InternalError("Token lengths are not available.");
+    }
+    if (scores.size() != token_lengths->size()) {
+      return absl::InternalError(absl::StrCat(
+          "Scores size ", scores.size(), " does not match token lengths size ",
+          token_lengths->size()));
+    }
+  }
+  // Write the scores and char/token lengths (if requested) to `ScorerOutputs`.
+  std::vector<litert::lm::ScorerOutput> scorer_outputs;
+  scorer_outputs.reserve(scores.size());
+  for (int i = 0; i < scores.size(); ++i) {
+    litert::lm::ScorerOutput& scorer_output = scorer_outputs.emplace_back();
+    scorer_output.score = scores[i];
+    if (store_char_and_token_lengths) {
+      scorer_output.option_text_char_length = target_text_vector[i].size();
+      scorer_output.option_text_token_length = (*token_lengths)[i];
+    }
+  }
+  return scorer_outputs;
 }
 
 void LogBenchmarkInfo(const litert::lm::BenchmarkInfo& benchmark_info,
@@ -531,7 +564,9 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
     ASSIGN_OR_RETURN(auto session, engine->CreateSession(session_config));
     std::string input_prompt = settings.input_prompt;
     std::string score_target_text = settings.score_target_text.value();
-    RunScoreText(engine.get(), session.get(), input_prompt, score_target_text);
+    ABSL_CHECK_OK(RunScoreText(engine.get(), session.get(), input_prompt,
+                               {score_target_text},
+                               /*store_char_and_token_lengths=*/false));
   } else {
     ABSL_LOG(INFO) << "Creating conversation";
     ASSIGN_OR_RETURN(

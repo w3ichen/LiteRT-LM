@@ -80,7 +80,9 @@ class MockSession : public Engine::Session {
        const DecodeConfig& decode_config),
       (override));
   MOCK_METHOD(absl::StatusOr<Responses>, RunTextScoring,
-              (const std::vector<absl::string_view>& target_text), (override));
+              (const std::vector<absl::string_view>& target_text,
+               bool store_token_lengths),
+              (override));
   MOCK_METHOD(absl::Status, RunPrefill,
               (const std::vector<InputData>& contents), (override));
   MOCK_METHOD(

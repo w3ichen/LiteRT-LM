@@ -511,7 +511,7 @@ absl::StatusOr<Responses> Decode(
 absl::StatusOr<Responses> Score(
     LlmExecutor& executor, Tokenizer& tokenizer,
     const std::vector<absl::string_view>& target_texts, const float temperature,
-    litert::TensorBuffer decoded_ids) {
+    litert::TensorBuffer decoded_ids, bool store_token_lengths) {
   const int num_output_candidates = target_texts.size();
   const int max_num_tokens = TryGetMaxNumTokens(executor);
   std::optional<BenchmarkInfo> benchmark_info;
@@ -570,7 +570,17 @@ absl::StatusOr<Responses> Score(
       }
     }
   }
-  return Responses(TaskState::kDone, /*response_texts=*/{}, std::move(scores));
+  std::vector<int> token_lengths;
+  if (store_token_lengths) {
+    // Store the token lengths of the target texts for each candidate into
+    // `Responses`. This is optional.
+    token_lengths.reserve(num_output_candidates);
+    for (int j = 0; j < num_output_candidates; ++j) {
+      token_lengths.push_back(ids_for_each_target_in_batch[j].size());
+    }
+  }
+  return Responses(TaskState::kDone, /*response_texts=*/{}, std::move(scores),
+                   std::move(token_lengths));
 }
 
 }  // namespace litert::lm::Tasks

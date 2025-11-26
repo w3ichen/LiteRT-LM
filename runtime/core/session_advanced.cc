@@ -210,7 +210,8 @@ absl::Status SessionAdvanced::RunDecodeAsync(
 }
 
 absl::StatusOr<Responses> SessionAdvanced::RunTextScoring(
-    const std::vector<absl::string_view>& target_text) {
+    const std::vector<absl::string_view>& target_text,
+    bool store_token_lengths) {
   return absl::UnimplementedError("RunTextScoring is not implemented.");
 }
 

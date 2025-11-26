@@ -49,7 +49,7 @@ absl::StatusOr<Responses> Decode(
 absl::StatusOr<Responses> Score(
     LlmExecutor& executor, Tokenizer& tokenizer,
     const std::vector<absl::string_view>& target_texts, float temperature,
-    litert::TensorBuffer decoded_ids);
+    litert::TensorBuffer decoded_ids, bool store_token_lengths = false);
 
 }  // namespace litert::lm::Tasks
 

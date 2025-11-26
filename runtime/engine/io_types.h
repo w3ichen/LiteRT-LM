@@ -17,6 +17,7 @@
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -152,6 +153,17 @@ class InputAudio {
 // types in the future.
 using InputData = std::variant<InputText, InputImage, InputAudio>;
 
+// A struct that holds the scoring output for a single option.
+struct ScorerOutput {
+  // The score of the option text.
+  // NOTE: this is the sum of the scores for each token in the option text.
+  double score;
+  // Character length of the option text.
+  std::optional<int> option_text_char_length;
+  // Token length of the option text.
+  std::optional<int> option_text_token_length;
+};
+
 // Creates a copy of the InputData.
 inline absl::StatusOr<InputData> CreateInputDataCopy(const InputData& data) {
   if (const auto* input_text = std::get_if<InputText>(&data)) {
@@ -192,10 +204,15 @@ class Responses {
  public:
   explicit Responses(TaskState task_state,
                      std::vector<std::string> response_texts = {},
-                     std::vector<float> scores = {})
+                     std::vector<float> scores = {},
+                     std::vector<int> token_lengths = {})
       : task_state_(task_state),
         response_texts_(std::move(response_texts)),
-        scores_(std::move(scores)) {};
+        scores_(std::move(scores)) {
+    if (!token_lengths.empty()) {
+      token_lengths_ = std::move(token_lengths);
+    }
+  };
 
   // Returns the task state.
   const TaskState& GetTaskState() const { return task_state_; }
@@ -215,6 +232,16 @@ class Responses {
   // Returns the mutable scores vector.
   std::vector<float>& GetMutableScores() { return scores_; };
 
+  // Returns the const token lengths vector.
+  const std::optional<std::vector<int>>& GetTokenLengths() const {
+    return token_lengths_;
+  }
+
+  // Returns the mutable token lengths vector.
+  std::optional<std::vector<int>>& GetMutableTokenLengths() {
+    return token_lengths_;
+  };
+
  private:
   // The state of the task.
   TaskState task_state_;
@@ -225,6 +252,9 @@ class Responses {
   // The output vector of scores for each response text. The "score" is pulled
   // from the probability of the last token in the response text.
   std::vector<float> scores_;
+
+  // The output vector of token lengths for each response text. Optional.
+  std::optional<std::vector<int>> token_lengths_;
 };
 std::ostream& operator<<(std::ostream& os, const Responses& responses);
 

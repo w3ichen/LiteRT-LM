@@ -96,6 +96,32 @@ absl::StatusOr<std::unique_ptr<FakeLlmExecutor>> CreateFakeLlmExecutor(
   return std::move(fake_executor);
 }
 
+absl::StatusOr<Responses> RunTextScoring(
+    const std::vector<std::vector<int>>& prefill_tokens,
+    const std::vector<std::vector<int>>& decode_tokens,
+    absl::string_view input_prompt, absl::string_view target_text,
+    const proto::SamplerParameters& sampler_params, bool store_token_lengths,
+    Tokenizer* tokenizer, ThreadPool* worker_thread_pool) {
+  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
+  SessionConfig session_config = SessionConfig::CreateDefault();
+  session_config.GetMutableSamplerParams() = sampler_params;
+  session_config.GetMutableStopTokenIds() = stop_token_ids;
+  session_config.SetStartTokenId(2);
+  session_config.SetSamplerBackend(Backend::CPU);
+  ASSIGN_OR_RETURN(auto executor,
+                   CreateFakeLlmExecutor(prefill_tokens, decode_tokens));
+  auto session = SessionBasic::Create(
+      executor.get(), tokenizer, /*vision_executor=*/nullptr,
+      /*audio_executor=*/nullptr, session_config, std::nullopt,
+      worker_thread_pool);
+  std::vector<InputData> inputs;
+  inputs.emplace_back(InputText(std::string(input_prompt)));
+  EXPECT_OK((*session)->RunPrefill(inputs));
+  std::vector<absl::string_view> target_texts;
+  target_texts.push_back(target_text);
+  return (*session)->RunTextScoring(target_texts, store_token_lengths);
+}
+
 class ExtendedTokenizer : public Tokenizer {
  public:
   static absl::StatusOr<std::unique_ptr<ExtendedTokenizer>> CreateFromFile(
@@ -593,7 +619,8 @@ TEST_F(SessionBasicTest, RunTextScoringEmptyTargetTextFailure) {
       /*audio_executor=*/nullptr, session_config, std::nullopt,
       worker_thread_pool_.get());
   std::vector<absl::string_view> target_text;
-  EXPECT_THAT((*session)->RunTextScoring(target_text),
+  EXPECT_THAT((*session)->RunTextScoring(target_text,
+                                         /*store_token_lengths=*/false),
               testing::status::StatusIs(absl::StatusCode::kInvalidArgument,
                                         "Target text size should be 1."));
 }
@@ -620,40 +647,46 @@ TEST_F(SessionBasicTest, RunTextScoringMultipleTargetTextFailure) {
   std::vector<absl::string_view> target_text;
   target_text.push_back("How's it going?");
   target_text.push_back("How are you?");
-  EXPECT_THAT((*session)->RunTextScoring(target_text),
-              testing::status::StatusIs(absl::StatusCode::kInvalidArgument,
-                                        "Target text size should be 1."));
+  EXPECT_THAT(
+      (*session)->RunTextScoring(target_text, /*store_token_lengths=*/false),
+      testing::status::StatusIs(absl::StatusCode::kInvalidArgument,
+                                "Target text size should be 1."));
 }
 
-TEST_F(SessionBasicTest, RunTextScoringSuccess) {
-  const std::vector<std::vector<int>> stop_token_ids = {{2294}};
-  SessionConfig session_config = SessionConfig::CreateDefault();
-  session_config.GetMutableSamplerParams() = sampler_params_;
-  session_config.GetMutableStopTokenIds() = stop_token_ids;
-  session_config.SetStartTokenId(2);
-  session_config.SetSamplerBackend(Backend::CPU);
-  ASSERT_OK_AND_ASSIGN(
-      auto executor,
-      CreateFakeLlmExecutor(
-          // "Hello World!"
-          /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
-          // "How's it going?"
-          /*decode_tokens=*/{
-              {224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}}));
-  auto session = SessionBasic::Create(
-      executor.get(), tokenizer_.get(), /*vision_executor=*/nullptr,
-      /*audio_executor=*/nullptr, session_config, std::nullopt,
+TEST_F(SessionBasicTest, RunTextScoringWithoutTokenLengthsSuccess) {
+  const auto responses_without_token_lengths = RunTextScoring(
+      // "Hello World!"
+      /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
+      // "How's it going?"
+      /*decode_tokens=*/{{224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}},
+      /*input_prompt=*/"Hello World!",
+      /*target_text=*/"How's it going?", sampler_params_,
+      /*store_token_lengths=*/false, tokenizer_.get(),
       worker_thread_pool_.get());
-  std::vector<InputData> inputs;
-  inputs.emplace_back(InputText("Hello World!"));
-  EXPECT_OK((*session)->RunPrefill(inputs));
-  std::vector<absl::string_view> target_text;
-  target_text.push_back("How's it going?");
-  auto responses = (*session)->RunTextScoring(target_text);
-  EXPECT_OK(responses);
+  EXPECT_OK(responses_without_token_lengths);
   // Expect a single output candidate with score 0.0f.
-  EXPECT_EQ(responses->GetScores().size(), 1);
-  EXPECT_EQ(responses->GetScores()[0], 0.0f);
+  EXPECT_EQ(responses_without_token_lengths->GetScores().size(), 1);
+  EXPECT_EQ(responses_without_token_lengths->GetScores()[0], 0.0f);
+  EXPECT_FALSE(responses_without_token_lengths->GetTokenLengths().has_value());
+}
+
+TEST_F(SessionBasicTest, RunTextScoringWithTokenLengthsSuccess) {
+  const auto responses_with_token_lengths = RunTextScoring(
+      // "Hello World!"
+      /*prefill_tokens=*/{{2, 90, 547, 58, 735, 210, 466, 2294}},
+      // "How's it going?"
+      /*decode_tokens=*/{{224}, {24}, {8}, {66}, {246}, {18}, {2295}, {2294}},
+      /*input_prompt=*/"Hello World!",
+      /*target_text=*/"How's it going?", sampler_params_,
+      /*store_token_lengths=*/true, tokenizer_.get(),
+      worker_thread_pool_.get());
+  EXPECT_OK(responses_with_token_lengths);
+  // Expect a single output candidate with score 0.0f and token length 7.
+  EXPECT_EQ(responses_with_token_lengths->GetScores().size(), 1);
+  EXPECT_EQ(responses_with_token_lengths->GetScores()[0], 0.0f);
+  EXPECT_TRUE(responses_with_token_lengths->GetTokenLengths().has_value());
+  EXPECT_EQ(responses_with_token_lengths->GetTokenLengths()->size(), 1);
+  EXPECT_EQ((*responses_with_token_lengths->GetTokenLengths())[0], 7);
 }
 
 TEST_F(SessionBasicTest, GenerateContentStream) {
