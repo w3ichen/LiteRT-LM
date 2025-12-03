@@ -273,6 +273,42 @@ TEST(PythonParserUtilsTest, ParseListOfDictsArgument) {
               }])json")));
 }
 
+TEST(PythonParserUtilsTest, ParseArgumentsWithTrailingComma) {
+  EXPECT_THAT(ParsePythonExpression("function_name(x='hello',)"),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
+                "name": "function_name",
+                "arguments": {
+                  "x": "hello"
+                }
+              }])json")));
+}
+
+TEST(PythonParserUtilsTest, ParseMultipleToolCallsWithTrailingComma) {
+  EXPECT_THAT(ParsePythonExpression("[func_1(x='hello'), func_2(y=2),]"),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
+                "name": "func_1",
+                "arguments": {
+                  "x": "hello"
+                }
+              },
+              {
+                "name": "func_2",
+                "arguments": {
+                  "y": 2
+                }
+              }])json")));
+}
+
+TEST(PythonParserUtilsTest, ParseListArgumentWithTrailingComma) {
+  EXPECT_THAT(ParsePythonExpression("function_name(x=[1, 2, 3,])"),
+              IsOkAndHolds(nlohmann::ordered_json::parse(R"json([{
+                "name": "function_name",
+                "arguments": {
+                  "x": [1, 2, 3]
+                }
+              }])json")));
+}
+
 TEST(PythonParserUtilsTest, PositionalArgumentsAreInvalid) {
   EXPECT_THAT(ParsePythonExpression("function_name(1, 2, 3)"),
               StatusIs(absl::StatusCode::kInvalidArgument));
