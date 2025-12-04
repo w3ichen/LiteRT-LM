@@ -143,10 +143,10 @@ class Engine(val engineConfig: EngineConfig) : AutoCloseable {
 
   companion object {
     /**
-     * Sets the minimum log serverity for the native libraries. This affects global logging for all
+     * Sets the minimum log severity for the native libraries. This affects global logging for all
      * engine instances. If not set, it uses the native libraries' default.
      */
-    fun setNativeMinLogServerity(level: LogSeverity) {
+    fun setNativeMinLogSeverity(level: LogSeverity) {
       LiteRtLmJni.nativeSetMinLogSeverity(level.severity)
     }
   }
