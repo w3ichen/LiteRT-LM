@@ -175,6 +175,9 @@ class Engine {
       ABSL_LOG(FATAL) << "CancelProcess is not implemented.";
     }
 
+    // Waits until all the tasks are done or the default timeout is reached.
+    virtual absl::Status WaitUntilDone() = 0;
+
     // Get the reference to the session config for the session.
     virtual const SessionConfig& GetSessionConfig() const = 0;
 

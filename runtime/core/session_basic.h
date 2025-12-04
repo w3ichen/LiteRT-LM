@@ -118,6 +118,10 @@ class SessionBasic : public Engine::Session {
     cancelled_.store(true);
   }
 
+  absl::Status WaitUntilDone() override {
+    return worker_thread_pool_.WaitUntilDone(Engine::kDefaultTimeout);
+  }
+
   const SessionConfig& GetSessionConfig() const override {
     return session_config_;
   }

@@ -104,6 +104,7 @@ class MockSession : public Engine::Session {
       (override));
   MOCK_METHOD(absl::StatusOr<BenchmarkInfo>, GetBenchmarkInfo, (), (override));
   MOCK_METHOD(void, CancelProcess, (), (override));
+  MOCK_METHOD(absl::Status, WaitUntilDone, (), (override));
   MOCK_METHOD(const SessionConfig&, GetSessionConfig, (), (const, override));
   MOCK_METHOD(const Tokenizer&, GetTokenizer, (), (const, override));
 };

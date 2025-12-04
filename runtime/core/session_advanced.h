@@ -138,6 +138,10 @@ class SessionAdvanced : public Engine::Session {
 
   const Tokenizer& GetTokenizer() const override { return tokenizer_; }
 
+  absl::Status WaitUntilDone() override {
+    return execution_manager_.WaitUntilAllDone(Engine::kDefaultTimeout);
+  }
+
  private:
   explicit SessionAdvanced(SessionId session_id,
                            ExecutionManager* absl_nonnull execution_manager,
