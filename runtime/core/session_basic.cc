@@ -159,7 +159,12 @@ absl::StatusOr<ExecutorInputs> SessionBasic::ProcessAndCombineContents(
       all_audio_data.push_back(std::move(single_audio_data));
       combined_token_ids.insert(combined_token_ids.end(), num_audio_tokens,
                                 ExecutorAudioData::kSpecialToken);
+    } else if (const auto* input_audio_end =
+                   std::get_if<InputAudioEnd>(&preprocessed_content)) {
       combined_token_ids.push_back(ExecutorAudioData::kEndToken);
+    } else {
+      return absl::InvalidArgumentError(
+          "Unsupported input data type in preprocessed_contents.");
     }
   }
 

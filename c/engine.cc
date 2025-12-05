@@ -347,7 +347,7 @@ LiteRtLmResponses* litert_lm_session_generate_content(LiteRtLmSession* session,
     return nullptr;
   }
   std::vector<std::variant<litert::lm::InputText, litert::lm::InputImage,
-                           litert::lm::InputAudio>>
+                           litert::lm::InputAudio, litert::lm::InputAudioEnd>>
       engine_inputs;
   engine_inputs.reserve(num_inputs);
   for (size_t i = 0; i < num_inputs; ++i) {
@@ -363,6 +363,9 @@ LiteRtLmResponses* litert_lm_session_generate_content(LiteRtLmSession* session,
       case kInputAudio:
         engine_inputs.emplace_back(litert::lm::InputAudio(std::string(
             static_cast<const char*>(inputs[i].data), inputs[i].size)));
+        break;
+      case kInputAudioEnd:
+        engine_inputs.emplace_back(litert::lm::InputAudioEnd());
         break;
     }
   }
@@ -385,7 +388,7 @@ int litert_lm_session_generate_content_stream(LiteRtLmSession* session,
     return -1;
   }
   std::vector<std::variant<litert::lm::InputText, litert::lm::InputImage,
-                           litert::lm::InputAudio>>
+                           litert::lm::InputAudio, litert::lm::InputAudioEnd>>
       engine_inputs;
   engine_inputs.reserve(num_inputs);
   for (size_t i = 0; i < num_inputs; ++i) {
@@ -401,6 +404,9 @@ int litert_lm_session_generate_content_stream(LiteRtLmSession* session,
       case kInputAudio:
         engine_inputs.emplace_back(litert::lm::InputAudio(std::string(
             static_cast<const char*>(inputs[i].data), inputs[i].size)));
+        break;
+      case kInputAudioEnd:
+        engine_inputs.emplace_back(litert::lm::InputAudioEnd());
         break;
     }
   }

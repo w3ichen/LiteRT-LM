@@ -403,6 +403,13 @@ TEST(CreateInputDataCopyTest, InputAudio) {
   EXPECT_TRUE(std::get<InputAudio>(copied_data).IsTensorBuffer());
 }
 
+TEST(CreateInputDataCopyTest, InputAudioEnd) {
+  InputData original_data = InputAudioEnd();
+  ASSERT_OK_AND_ASSIGN(InputData copied_data,
+                       CreateInputDataCopy(original_data));
+  ASSERT_TRUE(std::holds_alternative<InputAudioEnd>(copied_data));
+}
+
 TEST(ResponsesTest, GetTaskState) {
   {
     Responses responses(TaskState::kCreated, {});

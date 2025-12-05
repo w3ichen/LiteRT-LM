@@ -270,6 +270,7 @@ Gemma3DataProcessor::ToInputDataVectorImpl(
                            audio_file->length()))));
       audio_preprocessor_->Reset();
       input_data.emplace_back(InputAudio(std::move(preprocessed_audio)));
+      input_data.emplace_back(InputAudioEnd());
       input_data.emplace_back(InputText("\n\n"));
     }
   }

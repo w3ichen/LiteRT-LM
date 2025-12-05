@@ -149,9 +149,16 @@ class InputAudio {
   std::variant<std::string, TensorBuffer> data_;
 };
 
+// A signal to indicate the end of input audio.
+class InputAudioEnd {
+ public:
+  explicit InputAudioEnd() = default;
+};
+
 // A container to host the input data. Will be extended to support more input
 // types in the future.
-using InputData = std::variant<InputText, InputImage, InputAudio>;
+using InputData =
+    std::variant<InputText, InputImage, InputAudio, InputAudioEnd>;
 
 // A struct that holds the scoring output for a single option.
 struct ScorerOutput {
@@ -172,6 +179,8 @@ inline absl::StatusOr<InputData> CreateInputDataCopy(const InputData& data) {
     return input_image->CreateCopy();
   } else if (const auto* input_audio = std::get_if<InputAudio>(&data)) {
     return input_audio->CreateCopy();
+  } else if (const auto* input_audio_end = std::get_if<InputAudioEnd>(&data)) {
+    return InputAudioEnd();
   }
   return absl::FailedPreconditionError(
       "The InputData is not a InputText, InputImage, or InputAudio.");
