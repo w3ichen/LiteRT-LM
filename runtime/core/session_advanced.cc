@@ -100,6 +100,9 @@ absl::Status SessionAdvanced::RunPrefillAsync(
   RETURN_IF_ERROR(execution_manager_.AddPrefillTask(
       session_id_, task_id, std::move(preprocessed_contents), last_task_ids_,
       std::move(callback)));
+
+  last_task_ids_ = {task_id};
+
   return absl::OkStatus();
 }
 
@@ -131,17 +134,6 @@ absl::StatusOr<Responses> SessionAdvanced::RunDecode(
         responses->GetTexts().empty() && responses->GetScores().empty()) {
       return;
     }
-    // Normalizing the scores by the number of decode tokens if the task is
-    // completed.
-    if (responses->GetTexts().empty()) {
-      if (IsTaskEndState(responses->GetTaskState())) {
-        for (int i = 0; i < responses->GetScores().size(); ++i) {
-          collected_responses->GetMutableScores()[i] /=
-              std::max(1, num_decode_tokens);
-        }
-      }
-      return;
-    }
     // Accumulating the scores if it is provided.
     if (collected_responses->GetMutableScores().size() ==
         responses->GetScores().size()) {
@@ -156,11 +148,19 @@ absl::StatusOr<Responses> SessionAdvanced::RunDecode(
       for (int i = 0; i < responses->GetTexts().size(); ++i) {
         collected_responses->GetMutableTexts()[i] += responses->GetTexts()[i];
       }
-    } else {
+    } else if (!responses->GetTexts().empty()) {
       collected_responses = absl::InternalError(
           absl::StrCat("Decode responses size mismatch: ",
                        collected_responses->GetTexts().size(), " vs ",
                        responses->GetTexts().size()));
+    }
+    // Normalizing the scores by the number of decode tokens if the task is
+    // completed.
+    if (IsTaskEndState(responses->GetTaskState())) {
+      for (int i = 0; i < responses->GetScores().size(); ++i) {
+        collected_responses->GetMutableScores()[i] /=
+            std::max(1, num_decode_tokens);
+      }
     }
   };
 

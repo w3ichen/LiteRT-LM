@@ -182,6 +182,7 @@ absl::Status ExecutionManager::CreateTask(
                            task_lookup_.at(dep_task_id).task_state,
                            " but not in Done or Cancelled or Failed state."));
       }
+      dependent_tasks.erase(dep_task_id);
     } else {
       task_lookup_.at(dep_task_id).following_tasks.insert(task_id);
     }
@@ -312,10 +313,6 @@ absl::Status ExecutionManager::FinishTask(
       if (!status.ok()) {
         return invoke_callback_and_return(status);
       }
-    } else if (!IsTaskEndState(responses->GetTaskState())) {
-      return invoke_callback_and_return(absl::InvalidArgumentError(absl::StrCat(
-          "Expected task state for responses to be end state, but got ",
-          responses->GetTaskState())));
     } else if (responses->GetTaskState() == TaskState::kDone ||
                responses->GetTaskState() == TaskState::kMaxNumTokensReached) {
       for (TaskId following_task_id :
@@ -349,6 +346,10 @@ absl::Status ExecutionManager::FinishTask(
           RETURN_IF_ERROR(QueueTask(following_task_id));
         }
       }
+    } else if (!IsTaskEndState(responses->GetTaskState())) {
+      return invoke_callback_and_return(absl::InvalidArgumentError(absl::StrCat(
+          "Expected task state for responses to be end state, but got ",
+          responses->GetTaskState())));
     }
 
     if (responses.ok()) {
