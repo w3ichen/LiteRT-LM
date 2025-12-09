@@ -1133,6 +1133,7 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
       }
 #if defined(__APPLE__)
       gpu_compilation_options.SetPreferTextureWeights(false);
+      gpu_compilation_options.SetUseMetalArgumentBuffers(true);
 #else   // !__APPLE__
       gpu_compilation_options.SetPreferTextureWeights(true);
 #endif  // !__APPLE__
