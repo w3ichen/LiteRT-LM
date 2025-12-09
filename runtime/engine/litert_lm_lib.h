@@ -82,6 +82,7 @@ struct LiteRtLmSettings {
   bool gpu_madvise_original_shared_tensors = true;
   bool disable_cache = false;
   bool run_with_two_sessions = false;
+  int prefill_chunk_size = -1;
 };
 
 // Runs the LLM inference with the given settings.

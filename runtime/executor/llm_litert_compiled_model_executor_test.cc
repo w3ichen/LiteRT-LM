@@ -741,7 +741,8 @@ absl::StatusOr<
     std::pair<std::unique_ptr<ModelResources>,
               std::unique_ptr<LlmLiteRtCompiledModelExecutorDynamic>>>
 CreateDynamicExecutor(absl::string_view model_path,
-                      uint32_t kv_increment_size = 8) {
+                      uint32_t kv_increment_size = 8,
+                      int prefill_chunk_size = -1) {
   auto path = std::filesystem::path(::testing::SrcDir()) / model_path;
   ASSIGN_OR_RETURN(auto model_resources,
                    CreateExecutorModelResourcesLitertLm(path.string()));
@@ -753,6 +754,7 @@ CreateDynamicExecutor(absl::string_view model_path,
   CpuConfig config;
   config.number_of_threads = kNumThreads;
   config.kv_increment_size = kv_increment_size;
+  config.prefill_chunk_size = prefill_chunk_size;
   executor_settings->SetBackendConfig(config);
   LITERT_ASSIGN_OR_RETURN(
       auto env, Environment::Create(std::vector<Environment::Option>()));

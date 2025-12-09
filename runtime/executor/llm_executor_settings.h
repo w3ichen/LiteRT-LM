@@ -94,6 +94,13 @@ struct CpuConfig {
   // size.
   uint32_t kv_increment_size = 16;
 
+  // The maximum number of tokens to process in a single prefill chunk. This
+  // setting is only applicable to dynamically exported models. Using smaller
+  // chunk sizes can reduce peak memory usage and allow for more timely
+  // cancellation of long input sequences. A value of -1 indicates that no
+  // chunking is applied, and the entire prefill is processed at once.
+  int prefill_chunk_size = -1;
+
   // Number of threads. The default value is 4.
   uint32_t number_of_threads = 4;
 };

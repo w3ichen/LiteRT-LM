@@ -154,12 +154,15 @@ absl::StatusOr<EngineSettings> CreateEngineSettings(
           ":nocache");
     }
   }
-  if (backend == Backend::CPU && settings.num_cpu_threads > 0) {
+  if (backend == Backend::CPU) {
     auto& executor_settings = engine_settings.GetMutableMainExecutorSettings();
     ASSIGN_OR_RETURN(
         auto cpu_settings,
         executor_settings.MutableBackendConfig<litert::lm::CpuConfig>());
-    cpu_settings.number_of_threads = settings.num_cpu_threads;
+    if (settings.num_cpu_threads > 0) {
+      cpu_settings.number_of_threads = settings.num_cpu_threads;
+    }
+    cpu_settings.prefill_chunk_size = settings.prefill_chunk_size;
     executor_settings.SetBackendConfig(cpu_settings);
   }
   if (backend == Backend::GPU) {

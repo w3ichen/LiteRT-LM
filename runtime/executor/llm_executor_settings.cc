@@ -51,6 +51,7 @@ std::ostream& operator<<(std::ostream& os, const GpuConfig& config) {
 
 std::ostream& operator<<(std::ostream& os, const CpuConfig& config) {
   os << "kv_increment_size: " << config.kv_increment_size << "\n";
+  os << "prefill_chunk_size: " << config.prefill_chunk_size << "\n";
   os << "number_of_threads: " << config.number_of_threads << "\n";
   return os;
 }
@@ -102,6 +103,7 @@ absl::StatusOr<LlmExecutorSettings> LlmExecutorSettings::CreateDefault(
   if (backend == Backend::CPU) {
     CpuConfig config;
     config.kv_increment_size = 16;
+    config.prefill_chunk_size = -1;
     config.number_of_threads = 4;
     settings.SetBackendConfig(config);
   } else if (backend == Backend::GPU) {

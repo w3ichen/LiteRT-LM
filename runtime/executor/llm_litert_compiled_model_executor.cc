@@ -1397,9 +1397,26 @@ absl::Status LlmLiteRtCompiledModelExecutorDynamic::Prefill(
   RET_CHECK_EQ(tensor_type.Layout().Dimensions()[0], 1);
   RET_CHECK_GT(tensor_type.Layout().Dimensions()[1], 0)
       << "Prefill token ids must be non-empty.";
-  LITERT_ASSIGN_OR_RETURN(auto ids, ReferTensorBufferAsSpan<int32_t>(
-                                        *(*inputs.GetTextTokenIdsPtr())));
+  LITERT_ASSIGN_OR_RETURN(
+      absl::Span<int> ids,
+      ReferTensorBufferAsSpan<int32_t>(*(*inputs.GetTextTokenIdsPtr())));
 
+  if (prefill_chunk_size_ <= 0) {
+    return PrefillInternal(ids, params);
+  }
+
+  while (!ids.empty()) {
+    int chunk_size =
+        std::min(static_cast<int>(ids.size()), prefill_chunk_size_);
+    absl::Span<int> chunk_ids = ids.first(chunk_size);
+    ids = ids.subspan(chunk_size);
+    RETURN_IF_ERROR(PrefillInternal(chunk_ids, params));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status LlmLiteRtCompiledModelExecutorDynamic::PrefillInternal(
+    absl::Span<int> ids, const ExecutorPrefillParams& params) {
   // Check if have a pending input token. Note that 'internal_start_step' is
   // always equal to the number of processed tokens plus 1.
   ProcessedTokens::StepAndToken step_and_token =
@@ -1478,9 +1495,8 @@ absl::Status LlmLiteRtCompiledModelExecutorDynamic::Prefill(
   input_kv_cache_buffers_ = &kv_cache_buffers_1_;
   output_kv_cache_buffers_ = &kv_cache_buffers_1_;
 
-  RETURN_IF_ERROR(PrefillInternal("prefill", prefill_input_buffers, ids));
-
-  return absl::OkStatus();
+  return LlmLiteRtCompiledModelExecutorBase::PrefillInternal(
+      "prefill", prefill_input_buffers, ids);
 }
 
 absl::Status LlmLiteRtCompiledModelExecutorDynamic::DecodeInternal(
@@ -1546,11 +1562,13 @@ LlmLiteRtCompiledModelExecutorDynamic::Create(
   RET_CHECK_EQ(backend, Backend::CPU)
       << "LlmLiteRtCompiledModelExecutorDynamic only supports CPU backend.";
   uint32_t kv_increament_size = 0;
+  int prefill_chunk_size = -1;
   {
     Expected<CpuOptions> cpu_compilation_options = CpuOptions::Create();
     ASSIGN_OR_RETURN(const auto& cpu_config,
                      executor_settings.GetBackendConfig<CpuConfig>());
     kv_increament_size = cpu_config.kv_increment_size;
+    prefill_chunk_size = cpu_config.prefill_chunk_size;
     cpu_compilation_options->SetNumThreads(cpu_config.number_of_threads);
     auto weight_cache_file =
         executor_settings.GetWeightCacheFile(".xnnpack_cache");
@@ -1659,8 +1677,8 @@ LlmLiteRtCompiledModelExecutorDynamic::Create(
   return absl::WrapUnique(new LlmLiteRtCompiledModelExecutorDynamic(
       std::move(executor_settings), lrt_env, litert_model,
       std::move(compiled_model), std::move(decode_input_buffers),
-      std::move(decode_output_buffers), k_dynamic_dim, v_dynamic_dim,
-      kv_increament_size, std::move(key_cache_input_names),
+      std::move(decode_output_buffers), prefill_chunk_size, k_dynamic_dim,
+      v_dynamic_dim, kv_increament_size, std::move(key_cache_input_names),
       std::move(value_cache_input_names), signatures, batch_size,
       std::move(weight_cache_path), std::move(embedding_lookup),
       std::move(per_layer_embedding_lookup)));

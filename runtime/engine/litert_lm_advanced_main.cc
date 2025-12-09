@@ -53,6 +53,13 @@ ABSL_FLAG(std::string, input_prompt,
           "What is the tallest building in the world?",
           "Input prompt to use for testing LLM execution.");
 ABSL_FLAG(std::string, input_prompt_file, "", "File path to the input prompt.");
+ABSL_FLAG(int, prefill_chunk_size, -1,
+          "Prefill chunk size for LLM execution. A positive value enables "
+          "breaking the input prefill sequence into smaller chunks for "
+          "incremental processing. For example, a chunk size of 128 with an "
+          "input length of 300 results in 3 chunks: 128, 128, and 44 tokens. "
+          "A value of -1 disables chunking. Only supported by the dynamic "
+          "executor.");
 
 namespace {
 
@@ -132,6 +139,7 @@ absl::Status MainHelper(int argc, char** argv) {
            "[--log_sink_file=<log_sink_file>] "
            "[--max_num_tokens=<max_num_tokens>] "
            "[--prefill_batch_sizes=<size1>[,<size2>,...]]"
+           "[--prefill_chunk_size=<prefill_chunk_size>] "
            "[--vision_backend=<cpu|gpu>] [--audio_backend=<cpu|gpu>] "
            "[--sampler_backend=<cpu|gpu>] [--benchmark] "
            "[--benchmark_prefill_tokens=<num_prefill_tokens>] "
@@ -169,6 +177,7 @@ absl::Status MainHelper(int argc, char** argv) {
   ASSIGN_OR_RETURN(
       settings.prefill_batch_sizes,
       ParsePrefillBatchSizes(absl::GetFlag(FLAGS_prefill_batch_sizes)));
+  settings.prefill_chunk_size = absl::GetFlag(FLAGS_prefill_chunk_size);
   settings.num_output_candidates = absl::GetFlag(FLAGS_num_output_candidates);
   settings.benchmark = absl::GetFlag(FLAGS_benchmark);
   settings.benchmark_prefill_tokens =

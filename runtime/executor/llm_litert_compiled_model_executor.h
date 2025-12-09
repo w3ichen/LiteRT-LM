@@ -358,8 +358,9 @@ class LlmLiteRtCompiledModelExecutorDynamic
           decode_input_buffers,
       absl::flat_hash_map<absl::string_view, ::litert::TensorBuffer>
           decode_output_buffers,
-      int key_dynamic_dim_index, int value_dynamic_dim_index,
-      int kv_increament_size, std::vector<std::string> key_cache_input_names,
+      int prefill_chunk_size, int key_dynamic_dim_index,
+      int value_dynamic_dim_index, int kv_increament_size,
+      std::vector<std::string> key_cache_input_names,
       std::vector<std::string> value_cache_input_names,
       ModelSignatures signatures, int output_batch_size,
       std::string weight_cache_path,
@@ -377,17 +378,22 @@ class LlmLiteRtCompiledModelExecutorDynamic
             output_batch_size, std::move(weight_cache_path),
             std::move(embedding_lookup), std::move(per_layer_embedding_lookup),
             logits_data_type),
+        prefill_chunk_size_(prefill_chunk_size),
         key_dynamic_dim_index_(key_dynamic_dim_index),
         value_dynamic_dim_index_(value_dynamic_dim_index),
         kv_increament_size_(kv_increament_size),
         key_cache_input_names_(std::move(key_cache_input_names)),
         value_cache_input_names_(std::move(value_cache_input_names)) {}
 
+  absl::Status PrefillInternal(absl::Span<int> ids,
+                               const ExecutorPrefillParams& params);
+
   // Extends the base class DecodeInternal to handle KV cache buffers.
   absl::Status DecodeInternal(
       int step, const std::vector<std::shared_ptr<TokenData>>& token,
       TensorBuffer& output_logits) override;
 
+  int prefill_chunk_size_;
   int key_dynamic_dim_index_;
   int value_dynamic_dim_index_;
   uint32_t kv_increament_size_;
