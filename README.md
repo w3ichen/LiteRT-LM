@@ -201,12 +201,13 @@ device and your development platform.
 >
 > 1. Add `--define=litert_link_capi_so=true`
   `--define=resolve_symbols_in_exec=false` in the build command.
-> 2. `cp ./prebuilt/<your OS>/<shared libaries> <path to binary directory>/` and
- make sure the prebuilt .so/.dll/.dylib files are in the same directory as
-  litert_lm_main binary
-> 3. [Windows only] Download the dxil.dll and dxcompiler.dll from
- https://github.com/microsoft/DirectXShaderCompiler/releases and saved in the
- same directory as litert_lm_main binary.
+> 2. `mkdir -p <test_dir>; cp <your litert_lm_main> <test_dir>; cp ./prebuilt/<your OS>/<shared libaries> <test_dir>/`
+ and make sure the prebuilt .so/.dll/.dylib files are in the same directory as
+  `litert_lm_main` binary
+> 3. [Windows only] Download the dxc_2025_07_14.zip or the latest zip file from
+ https://github.com/microsoft/DirectXShaderCompiler/releases, unzip the file and
+ locate the right architecture directory under `bin`, copy the `dxil.dll` and
+ `dxcompiler.dll` into the same directory as the `litert_lm_main` binary.
 
 <details>
 <summary><strong>Deploy to Windows</strong></summary>
