@@ -79,8 +79,6 @@ constexpr absl::string_view kPrefillSignatureRunner = "prefill";
 constexpr absl::string_view kDecodeSignatureRunner = "decode";
 constexpr int kDynamicDimValue = -1;
 
-bool IsCalculationPrecisionF16() { return true; }
-
 absl::Status InitializeEmbeddingLookups(
     ModelResources& resources,
     std::unique_ptr<EmbeddingLookupManager>& embedding_lookup,
@@ -493,7 +491,7 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::PrefillInternal(
     if (signatures_.input_attn_mask.has_value()) {
       RETURN_IF_ERROR(InitializeAttentionMask(
           prefill_input_buffers[signatures_.input_attn_mask.value()],
-          IsCalculationPrecisionF16()));
+          use_fp16_precision_));
     }
     // TODO(b/425396146): Add the unit tests for checking the prefill length.
     // We always hold one pending token in the input ids for the next
@@ -764,7 +762,7 @@ absl::Status LlmLiteRtCompiledModelExecutorBase::DecodeInternal(
   if (signatures_.input_attn_mask.has_value()) {
     RETURN_IF_ERROR(InitializeAttentionMask(
         decode_input_buffers_[signatures_.input_attn_mask.value()],
-        IsCalculationPrecisionF16()));
+        use_fp16_precision_));
     RETURN_IF_ERROR(FillAttentionMask(
         decode_input_buffers_[signatures_.input_attn_mask.value()], step,
         /*steps=*/1));
@@ -1111,6 +1109,7 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
     activation_data_type = executor_settings.GetActivationDataType().value();
   }
   const Backend backend = executor_settings.GetBackend();
+  bool use_fp16_precision = true;
   switch (backend) {
     case Backend::GPU: {
       // TODO: b/403132820 - Add accelerator compilation options for ML_DRIFT.
@@ -1178,6 +1177,7 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
       break;
     }
     case Backend::CPU: {
+      use_fp16_precision = false;
       Expected<CpuOptions> cpu_compilation_options = CpuOptions::Create();
       const uint32_t num_threads =
           executor_settings.GetBackendConfig<CpuConfig>()->number_of_threads;
@@ -1380,7 +1380,7 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
       std::move(decode_output_kv_cache_buffers), std::move(prefill_runner_set),
       signatures, batch_size, std::move(weight_cache_path),
       std::move(embedding_lookup), std::move(per_layer_embedding_lookup),
-      activation_data_type));
+      use_fp16_precision, activation_data_type));
 }
 
 /* ===========================================================================*/
@@ -1680,7 +1680,7 @@ LlmLiteRtCompiledModelExecutorDynamic::Create(
       v_dynamic_dim, kv_increament_size, std::move(key_cache_input_names),
       std::move(value_cache_input_names), signatures, batch_size,
       std::move(weight_cache_path), std::move(embedding_lookup),
-      std::move(per_layer_embedding_lookup)));
+      std::move(per_layer_embedding_lookup), /*use_fp16_precision=*/false));
 }
 
 }  // namespace litert::lm

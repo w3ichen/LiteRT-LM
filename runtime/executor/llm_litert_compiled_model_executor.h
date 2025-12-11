@@ -137,7 +137,7 @@ class LlmLiteRtCompiledModelExecutorBase : public LlmExecutor {
       std::string weight_cache_path,
       std::unique_ptr<EmbeddingLookupManager> embedding_lookup,
       std::unique_ptr<EmbeddingLookupManager> per_layer_embedding_lookup,
-      LogitsDataType logits_data_type)
+      bool use_fp16_precision, LogitsDataType logits_data_type)
       : executor_settings_(std::move(executor_settings)),
         env_(env),
         model_(*model),
@@ -155,6 +155,7 @@ class LlmLiteRtCompiledModelExecutorBase : public LlmExecutor {
         weight_cache_path_(std::move(weight_cache_path)),
         embedding_lookup_(std::move(embedding_lookup)),
         per_layer_embedding_lookup_(std::move(per_layer_embedding_lookup)),
+        use_fp16_precision_(use_fp16_precision),
         logits_data_type_(logits_data_type) {}
 
  protected:
@@ -268,6 +269,9 @@ class LlmLiteRtCompiledModelExecutorBase : public LlmExecutor {
   // The embedding lookup for the optional per layer embedder model.
   std::unique_ptr<EmbeddingLookupManager> per_layer_embedding_lookup_;
 
+  // Whether to use FP16 precision for the calculation.
+  bool use_fp16_precision_;
+
   // The logits data type of the model, used to determine the data type of the
   // logits tensor for gpu sampling.
   LogitsDataType logits_data_type_;
@@ -312,6 +316,7 @@ class LlmLiteRtCompiledModelExecutorStatic
       std::unique_ptr<EmbeddingLookupManager> embedding_lookup = nullptr,
       std::unique_ptr<EmbeddingLookupManager> per_layer_embedding_lookup =
           nullptr,
+      bool use_fp16_precision = true,
       LogitsDataType logits_data_type = LogitsDataType::FLOAT32)
       : LlmLiteRtCompiledModelExecutorBase(
             std::move(executor_settings), env, model, std::move(compiled_model),
@@ -322,7 +327,7 @@ class LlmLiteRtCompiledModelExecutorStatic
             std::move(decode_output_kv_cache_buffers), signatures,
             output_batch_size, std::move(weight_cache_path),
             std::move(embedding_lookup), std::move(per_layer_embedding_lookup),
-            logits_data_type),
+            use_fp16_precision, logits_data_type),
         prefill_signature_map_(std::move(prefill_signature_map)) {}
 
   SortedPrefillSignatureMap prefill_signature_map_;
@@ -367,6 +372,7 @@ class LlmLiteRtCompiledModelExecutorDynamic
       std::unique_ptr<EmbeddingLookupManager> embedding_lookup = nullptr,
       std::unique_ptr<EmbeddingLookupManager> per_layer_embedding_lookup =
           nullptr,
+      bool use_fp16_precision = true,
       LogitsDataType logits_data_type = LogitsDataType::FLOAT32)
       : LlmLiteRtCompiledModelExecutorBase(
             std::move(executor_settings), env, model, std::move(compiled_model),
@@ -377,7 +383,7 @@ class LlmLiteRtCompiledModelExecutorDynamic
             /*decode_output_kv_cache_buffers=*/std::nullopt, signatures,
             output_batch_size, std::move(weight_cache_path),
             std::move(embedding_lookup), std::move(per_layer_embedding_lookup),
-            logits_data_type),
+            use_fp16_precision, logits_data_type),
         prefill_chunk_size_(prefill_chunk_size),
         key_dynamic_dim_index_(key_dynamic_dim_index),
         value_dynamic_dim_index_(value_dynamic_dim_index),
