@@ -303,30 +303,9 @@ cc_test(
 
 cc_library(
     name = "scoped_file",
-    srcs = ["scoped_file.cc"] + select({
-        "@platforms//os:windows": ["scoped_file_win.cc"],
-        "//conditions:default": ["scoped_file_posix.cc"],
-    }),
     hdrs = ["scoped_file.h"],
     deps = [
-        ":litert_status_util",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:string_view",
-    ],
-)
-
-cc_test(
-    name = "scoped_file_test",
-    srcs = ["scoped_file_test.cc"],
-    deps = [
-        ":scoped_file",
-        ":test_utils",
-        "@com_google_googletest//:gtest_main",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-        "@com_google_absl//absl/strings:string_view",
+        "@litert//litert/cc/internal:scoped_file",
     ],
 )
 
