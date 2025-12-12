@@ -46,12 +46,15 @@ load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_regi
 
 rules_rust_dependencies()
 
-rust_register_toolchains(extra_target_triples = [
-    # Explicitly add toolchains for mobile. Desktop platforms are supported by default.
-    "aarch64-linux-android",
-    "aarch64-apple-ios",
-    "aarch64-apple-ios-sim",
-])
+rust_register_toolchains(
+    edition = "2021",
+    extra_target_triples = [
+        # Explicitly add toolchains for mobile. Desktop platforms are supported by default.
+        "aarch64-linux-android",
+        "aarch64-apple-ios",
+        "aarch64-apple-ios-sim",
+    ],
+)
 
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 
@@ -409,24 +412,6 @@ http_archive(
     strip_prefix = "antlr4-bd8f9930d053ec6a83e7d751e8c6f69138957665",
     urls = ["https://github.com/antlr/antlr4/archive/bd8f9930d053ec6a83e7d751e8c6f69138957665.tar.gz"],
 )
-
-# Rust protobufs ---------------------------------------------------------------------------------
-http_archive(
-    name = "rules_rust_protobuf",
-    sha256 = "53c1bac7ec48f7ce48c4c1c6aa006f27515add2aeb05725937224e6e00ec7cea",
-    strip_prefix = "extensions/protobuf",
-    url = "https://github.com/bazelbuild/rules_rust/releases/download/0.61.0/rules_rust-0.61.0.tar.gz",
-)
-
-load("@rules_rust_protobuf//:repositories.bzl", "rust_proto_protobuf_dependencies", "rust_proto_protobuf_register_toolchains")
-
-rust_proto_protobuf_dependencies()
-
-rust_proto_protobuf_register_toolchains()
-
-load("@rules_rust_protobuf//:transitive_repositories.bzl", "rust_proto_protobuf_transitive_repositories")
-
-rust_proto_protobuf_transitive_repositories()
 
 # Android rules. Need latest rules_android_ndk to use NDK 26+.
 load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")

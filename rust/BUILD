@@ -12,34 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
-load("@com_google_protobuf//rust:defs.bzl", "rust_proto_library")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 
 package(
     default_visibility = [
-        ":default_visibility",
+        "//:__subpackages__",
     ],
 )
 
-package_group(
-    name = "default_visibility",
-    packages = [
-        "//runtime/components/tool_use/...",
+string_flag(
+    name = "rust_proto_library_kernel",
+    build_setting_default = "cpp",
+    values = [
+        "upb",
+        "cpp",
     ],
 )
 
-proto_library(
-    name = "tool_call_proto",
-    srcs = ["tool_call.proto"],
-)
-
-cc_proto_library(
-    name = "tool_call_cc_proto",
-    deps = [":tool_call_proto"],
-)
-
-rust_proto_library(
-    name = "tool_call_rust_proto",
-    deps = [":tool_call_proto"],
+config_setting(
+    name = "use_upb_kernel",
+    flag_values = {
+        ":rust_proto_library_kernel": "upb",
+    },
+    visibility = ["//:__subpackages__"],
 )

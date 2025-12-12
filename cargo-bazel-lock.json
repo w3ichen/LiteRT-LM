@@ -1,5 +1,5 @@
 {
-  "checksum": "c223322d50e159d55aacb83c6515d31d4db7571d8d0f325dcdc1034b7e140f09",
+  "checksum": "9a81b437e58a0962db9c14e6eff1fdf7b668299461f51d264f84001844351ecc",
   "crates": {
     "aho-corasick 1.1.3": {
       "name": "aho-corasick",
@@ -56,6 +56,45 @@
         "Unlicense"
       ],
       "license_file": "LICENSE-MIT"
+    },
+    "autocfg 1.5.0": {
+      "name": "autocfg",
+      "version": "1.5.0",
+      "package_url": "https://github.com/cuviper/autocfg",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/autocfg/1.5.0/download",
+          "sha256": "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "autocfg",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "autocfg",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "edition": "2015",
+        "version": "1.5.0"
+      },
+      "license": "Apache-2.0 OR MIT",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "base64 0.13.1": {
       "name": "base64",
@@ -543,7 +582,7 @@
               "target": "strsim"
             },
             {
-              "id": "syn 2.0.102",
+              "id": "syn 2.0.111",
               "target": "syn"
             }
           ],
@@ -598,7 +637,7 @@
               "target": "quote"
             },
             {
-              "id": "syn 2.0.102",
+              "id": "syn 2.0.111",
               "target": "syn"
             }
           ],
@@ -718,7 +757,7 @@
               "target": "quote"
             },
             {
-              "id": "syn 2.0.102",
+              "id": "syn 2.0.111",
               "target": "syn"
             }
           ],
@@ -776,7 +815,7 @@
               "target": "derive_builder_core"
             },
             {
-              "id": "syn 2.0.102",
+              "id": "syn 2.0.111",
               "target": "syn"
             }
           ],
@@ -1021,6 +1060,125 @@
         "MIT"
       ],
       "license_file": "LICENSE-APACHE"
+    },
+    "googletest 0.14.2": {
+      "name": "googletest",
+      "version": "0.14.2",
+      "package_url": "https://github.com/google/googletest-rust",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/googletest/0.14.2/download",
+          "sha256": "06597b7d02ee58b9a37f522785ac15b9e18c6b178747c4439a6c03fbb35ea753"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "googletest",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "googletest",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "num-traits 0.2.19",
+              "target": "num_traits"
+            },
+            {
+              "id": "regex 1.11.1",
+              "target": "regex"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "googletest_macro 0.14.2",
+              "target": "googletest_macro"
+            },
+            {
+              "id": "rustversion 1.0.22",
+              "target": "rustversion"
+            }
+          ],
+          "selects": {}
+        },
+        "version": "0.14.2"
+      },
+      "license": "Apache-2.0",
+      "license_ids": [
+        "Apache-2.0"
+      ],
+      "license_file": "LICENSE"
+    },
+    "googletest_macro 0.14.2": {
+      "name": "googletest_macro",
+      "version": "0.14.2",
+      "package_url": "https://github.com/google/googletest-rust",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/googletest_macro/0.14.2/download",
+          "sha256": "c31d9f07c9c19b855faebf71637be3b43f8e13a518aece5d61a3beee7710b4ef"
+        }
+      },
+      "targets": [
+        {
+          "ProcMacro": {
+            "crate_name": "googletest_macro",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "googletest_macro",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "proc-macro2 1.0.95",
+              "target": "proc_macro2"
+            },
+            {
+              "id": "quote 1.0.40",
+              "target": "quote"
+            },
+            {
+              "id": "syn 2.0.111",
+              "target": "syn"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.14.2"
+      },
+      "license": "Apache-2.0",
+      "license_ids": [
+        "Apache-2.0"
+      ],
+      "license_file": "LICENSE"
     },
     "ident_case 1.0.1": {
       "name": "ident_case",
@@ -1358,12 +1516,24 @@
         "deps": {
           "common": [
             {
+              "id": "googletest 0.14.2",
+              "target": "googletest"
+            },
+            {
+              "id": "quote 1.0.40",
+              "target": "quote"
+            },
+            {
               "id": "serde 1.0.219",
               "target": "serde"
             },
             {
               "id": "serde_json 1.0.140",
               "target": "serde_json"
+            },
+            {
+              "id": "syn 2.0.111",
+              "target": "syn"
             },
             {
               "id": "tokenizers 0.21.1",
@@ -1373,6 +1543,15 @@
           "selects": {}
         },
         "edition": "2021",
+        "proc_macro_deps": {
+          "common": [
+            {
+              "id": "paste 1.0.15",
+              "target": "paste"
+            }
+          ],
+          "selects": {}
+        },
         "version": "0.1.0"
       },
       "license": null,
@@ -1705,7 +1884,7 @@
               "target": "quote"
             },
             {
-              "id": "syn 2.0.102",
+              "id": "syn 2.0.111",
               "target": "syn"
             }
           ],
@@ -1779,6 +1958,93 @@
         "MIT"
       ],
       "license_file": "LICENSE"
+    },
+    "num-traits 0.2.19": {
+      "name": "num-traits",
+      "version": "0.2.19",
+      "package_url": "https://github.com/rust-num/num-traits",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/num-traits/0.2.19/download",
+          "sha256": "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
+        }
+      },
+      "targets": [
+        {
+          "Library": {
+            "crate_name": "num_traits",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "num_traits",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "crate_features": {
+          "common": [
+            "default",
+            "std"
+          ],
+          "selects": {}
+        },
+        "deps": {
+          "common": [
+            {
+              "id": "num-traits 0.2.19",
+              "target": "build_script_build"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2021",
+        "version": "0.2.19"
+      },
+      "build_script_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "compile_data_glob_excludes": [
+          "**/*.rs"
+        ],
+        "data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "autocfg 1.5.0",
+              "target": "autocfg"
+            }
+          ],
+          "selects": {}
+        }
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
     },
     "once_cell 1.21.3": {
       "name": "once_cell",
@@ -2182,10 +2448,25 @@
         ],
         "crate_features": {
           "common": [
-            "default",
             "proc-macro"
           ],
-          "selects": {}
+          "selects": {
+            "aarch64-apple-darwin": [
+              "default"
+            ],
+            "aarch64-unknown-linux-gnu": [
+              "default"
+            ],
+            "x86_64-pc-windows-msvc": [
+              "default"
+            ],
+            "x86_64-unknown-linux-gnu": [
+              "default"
+            ],
+            "x86_64-unknown-nixos-gnu": [
+              "default"
+            ]
+          }
         },
         "deps": {
           "common": [
@@ -2904,6 +3185,77 @@
       ],
       "license_file": "LICENSE-APACHE"
     },
+    "rustversion 1.0.22": {
+      "name": "rustversion",
+      "version": "1.0.22",
+      "package_url": "https://github.com/dtolnay/rustversion",
+      "repository": {
+        "Http": {
+          "url": "https://static.crates.io/crates/rustversion/1.0.22/download",
+          "sha256": "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
+        }
+      },
+      "targets": [
+        {
+          "ProcMacro": {
+            "crate_name": "rustversion",
+            "crate_root": "src/lib.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        },
+        {
+          "BuildScript": {
+            "crate_name": "build_script_build",
+            "crate_root": "build/build.rs",
+            "srcs": {
+              "allow_empty": true,
+              "include": [
+                "**/*.rs"
+              ]
+            }
+          }
+        }
+      ],
+      "library_target_name": "rustversion",
+      "common_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "deps": {
+          "common": [
+            {
+              "id": "rustversion 1.0.22",
+              "target": "build_script_build"
+            }
+          ],
+          "selects": {}
+        },
+        "edition": "2018",
+        "version": "1.0.22"
+      },
+      "build_script_attrs": {
+        "compile_data_glob": [
+          "**"
+        ],
+        "compile_data_glob_excludes": [
+          "**/*.rs"
+        ],
+        "data_glob": [
+          "**"
+        ]
+      },
+      "license": "MIT OR Apache-2.0",
+      "license_ids": [
+        "Apache-2.0",
+        "MIT"
+      ],
+      "license_file": "LICENSE-APACHE"
+    },
     "ryu 1.0.20": {
       "name": "ryu",
       "version": "1.0.20",
@@ -3078,7 +3430,7 @@
               "target": "quote"
             },
             {
-              "id": "syn 2.0.102",
+              "id": "syn 2.0.111",
               "target": "syn"
             }
           ],
@@ -3370,14 +3722,14 @@
       ],
       "license_file": "LICENSE"
     },
-    "syn 2.0.102": {
+    "syn 2.0.111": {
       "name": "syn",
-      "version": "2.0.102",
+      "version": "2.0.111",
       "package_url": "https://github.com/dtolnay/syn",
       "repository": {
         "Http": {
-          "url": "https://static.crates.io/crates/syn/2.0.102/download",
-          "sha256": "f6397daf94fa90f058bd0fd88429dd9e5738999cca8d701813c80723add80462"
+          "url": "https://static.crates.io/crates/syn/2.0.111/download",
+          "sha256": "390cc9a294ab71bdb1aa2e99d13be9c753cd2d7bd6560c77118597410c4d2e87"
         }
       },
       "targets": [
@@ -3404,13 +3756,32 @@
             "clone-impls",
             "default",
             "derive",
-            "extra-traits",
-            "full",
             "parsing",
             "printing",
             "proc-macro"
           ],
-          "selects": {}
+          "selects": {
+            "aarch64-apple-darwin": [
+              "extra-traits",
+              "full"
+            ],
+            "aarch64-unknown-linux-gnu": [
+              "extra-traits",
+              "full"
+            ],
+            "x86_64-pc-windows-msvc": [
+              "extra-traits",
+              "full"
+            ],
+            "x86_64-unknown-linux-gnu": [
+              "extra-traits",
+              "full"
+            ],
+            "x86_64-unknown-nixos-gnu": [
+              "extra-traits",
+              "full"
+            ]
+          }
         },
         "deps": {
           "common": [
@@ -3430,7 +3801,7 @@
           "selects": {}
         },
         "edition": "2021",
-        "version": "2.0.102"
+        "version": "2.0.111"
       },
       "license": "MIT OR Apache-2.0",
       "license_ids": [
@@ -3566,7 +3937,7 @@
               "target": "quote"
             },
             {
-              "id": "syn 2.0.102",
+              "id": "syn 2.0.111",
               "target": "syn"
             }
           ],
@@ -4062,7 +4433,7 @@
               "target": "quote"
             },
             {
-              "id": "syn 2.0.102",
+              "id": "syn 2.0.111",
               "target": "syn"
             }
           ],
@@ -4134,8 +4505,12 @@
     ]
   },
   "direct_deps": [
+    "googletest 0.14.2",
+    "paste 1.0.15",
+    "quote 1.0.40",
     "serde 1.0.219",
     "serde_json 1.0.140",
+    "syn 2.0.111",
     "tokenizers 0.21.1"
   ],
   "direct_dev_deps": [],
