@@ -262,6 +262,9 @@ TEST(LlmExecutorConfigTest, LlmExecutorSettingsWithAdvancedSettings) {
       .gpu_madvise_original_shared_tensors = true,
       .is_benchmark = true,
       .preferred_device_substr = "nvidia",
+      .num_threads_to_upload = 4,
+      .num_threads_to_compile = 2,
+      .convert_weights_on_gpu = true,
   });
 
   std::stringstream oss;
@@ -297,6 +300,9 @@ num_logits_to_print_after_decode: 10
 gpu_madvise_original_shared_tensors: 1
 is_benchmark: 1
 preferred_device_substr: nvidia
+num_threads_to_upload: 4
+num_threads_to_compile: 2
+convert_weights_on_gpu: 1
 
 )");
   EXPECT_EQ(oss.str(), expected_output);

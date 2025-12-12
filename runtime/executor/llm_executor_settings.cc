@@ -70,6 +70,9 @@ std::ostream& operator<<(std::ostream& os, const AdvancedSettings& settings) {
      << settings.gpu_madvise_original_shared_tensors << "\n";
   os << "is_benchmark: " << settings.is_benchmark << "\n";
   os << "preferred_device_substr: " << settings.preferred_device_substr << "\n";
+  os << "num_threads_to_upload: " << settings.num_threads_to_upload << "\n";
+  os << "num_threads_to_compile: " << settings.num_threads_to_compile << "\n";
+  os << "convert_weights_on_gpu: " << settings.convert_weights_on_gpu << "\n";
   return os;
 }
 

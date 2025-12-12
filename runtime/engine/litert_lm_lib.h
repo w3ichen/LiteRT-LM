@@ -84,6 +84,9 @@ struct LiteRtLmSettings {
   bool run_with_two_sessions = false;
   int prefill_chunk_size = -1;
   std::string preferred_device_substr = "";
+  int num_threads_to_upload = -1;
+  int num_threads_to_compile = -1;
+  bool convert_weights_on_gpu = false;
 };
 
 // Runs the LLM inference with the given settings.

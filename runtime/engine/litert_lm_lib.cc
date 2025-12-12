@@ -191,6 +191,9 @@ absl::StatusOr<EngineSettings> CreateEngineSettings(
           settings.gpu_madvise_original_shared_tensors,
       .is_benchmark = settings.benchmark,
       .preferred_device_substr = settings.preferred_device_substr,
+      .num_threads_to_upload = settings.num_threads_to_upload,
+      .num_threads_to_compile = settings.num_threads_to_compile,
+      .convert_weights_on_gpu = settings.convert_weights_on_gpu,
   };
   if (advanced_settings != AdvancedSettings()) {
     engine_settings.GetMutableMainExecutorSettings().SetAdvancedSettings(

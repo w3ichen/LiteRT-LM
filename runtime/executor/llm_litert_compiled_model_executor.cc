@@ -80,6 +80,10 @@ constexpr absl::string_view kPrefillSignatureRunner = "prefill";
 constexpr absl::string_view kDecodeSignatureRunner = "decode";
 constexpr int kDynamicDimValue = -1;
 
+// Default number of threads for WebGPU weight upload and kernel compilation.
+constexpr int kDefaultNumThreadsToUpload = 2;
+constexpr int kDefaultNumThreadsToCompile = 1;
+
 absl::Status InitializeEmbeddingLookups(
     ModelResources& resources,
     std::unique_ptr<EmbeddingLookupManager>& embedding_lookup,
@@ -1163,6 +1167,8 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
         }
       }
       auto advanced_settings = executor_settings.GetAdvancedSettings();
+      int num_threads_to_upload = kDefaultNumThreadsToUpload;
+      int num_threads_to_compile = kDefaultNumThreadsToCompile;
       if (advanced_settings) {
         gpu_compilation_options.SetMadviseOriginalSharedTensors(
             advanced_settings->gpu_madvise_original_shared_tensors);
@@ -1174,6 +1180,15 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
           gpu_compilation_options.SetPreferredDeviceSubstr(
               advanced_settings->preferred_device_substr.c_str());
         }
+        if (advanced_settings->num_threads_to_upload >= 0) {
+          num_threads_to_upload = advanced_settings->num_threads_to_upload;
+        }
+        if (advanced_settings->num_threads_to_compile >= 0) {
+          num_threads_to_compile = advanced_settings->num_threads_to_compile;
+        }
+        if (advanced_settings->convert_weights_on_gpu) {
+          gpu_compilation_options.SetConvertWeightsOnGpu(true);
+        }
       }
       // TODO b/441627719 - Select backend by runtime options.
 #if defined(LITERT_USE_WEBGPU_ACCELERATOR)
@@ -1183,6 +1198,8 @@ LlmLiteRtCompiledModelExecutorStatic::Create(
       // buffer preparation. 2 steps ahead because KV cache is swapped and the
       // GPU resource bindings are the same as the previous previous step.
       gpu_compilation_options.SetNumStepsOfCommandBufferPreparations(2);
+      gpu_compilation_options.SetNumThreadsToUpload(num_threads_to_upload);
+      gpu_compilation_options.SetNumThreadsToCompile(num_threads_to_compile);
       compilation_options.SetHardwareAccelerators(litert::HwAccelerators::kGpu);
       break;
     }

@@ -98,3 +98,12 @@ ABSL_FLAG(std::string, preferred_device_substr, "",
           "If not empty, the adapter which the device name contains the "
           "substring will be chosen. "
           "If empty, the device will be determined by other factors.");
+ABSL_FLAG(int, num_threads_to_upload, -1,
+          "Number of threads for WebGPU weight upload. By default (-1), it's "
+          "determined by the runtime.");
+ABSL_FLAG(int, num_threads_to_compile, -1,
+          "Number of threads for WebGPU kernel compilation. By default (-1), "
+          "it's determined by the runtime.");
+ABSL_FLAG(bool, convert_weights_on_gpu, false,
+          "If true, the executor will convert weights on GPU. It's an "
+          "experimental feature.");
