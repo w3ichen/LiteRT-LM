@@ -240,6 +240,12 @@ SessionConfig CreateSessionConfig(const LiteRtLmSettings& settings) {
   if (sampler_backend.has_value()) {
     session_config.SetSamplerBackend(*sampler_backend);
   }
+  if (settings.vision_backend.has_value()) {
+    session_config.SetVisionModalityEnabled(true);
+  }
+  if (settings.audio_backend.has_value()) {
+    session_config.SetAudioModalityEnabled(true);
+  }
   return session_config;
 }
 
