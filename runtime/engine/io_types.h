@@ -195,6 +195,12 @@ class InputAudioEnd {
   explicit InputAudioEnd() = default;
 };
 
+inline std::ostream& operator<<(std::ostream& os,
+                                const InputAudioEnd& input_audio_end) {
+  os << "[InputAudioEnd]";
+  return os;
+}
+
 // A container to host the input data. Will be extended to support more input
 // types in the future.
 using InputData =

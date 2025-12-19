@@ -1705,6 +1705,7 @@ TEST_F(SessionAdvancedTest, ProcessAndCombineContentsTextAndAudioSuccess) {
           {1, kSpectrogramSequenceLength, kSpectrogramFrequencySlots}));
   InputAudio input_audio(std::move(mel_spectrogram_data));
   inputs.emplace_back(std::move(input_audio));
+  inputs.emplace_back(InputAudioEnd());
   EXPECT_OK(session->RunPrefill(inputs));
 }
 
@@ -1773,6 +1774,7 @@ TEST_F(SessionAdvancedTest, ProcessAndCombineContentsTextAudioTextSuccess) {
           {1, kSpectrogramSequenceLength, kSpectrogramFrequencySlots}));
   InputAudio input_audio(std::move(mel_spectrogram_data));
   inputs.emplace_back(std::move(input_audio));
+  inputs.emplace_back(InputAudioEnd());
   inputs.emplace_back(InputText("What does the audio say?"));
   EXPECT_OK(session->RunPrefill(inputs));
 }

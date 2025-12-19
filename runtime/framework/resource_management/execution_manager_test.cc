@@ -112,8 +112,13 @@ class ExecutionManagerTest : public ::testing::Test {
                              /*litert_env=*/nullptr));
   }
 
-  std::unique_ptr<FakeLlmExecutor> CreateDefaultFakeLlmExecutor() {
+  std::unique_ptr<FakeLlmExecutor> CreateDefaultFakeLlmExecutor(
+      std::optional<std::vector<std::vector<int>>> override_prefill_tokens =
+          std::nullopt) {
     auto prefill_tokens = std::vector<std::vector<int>>{{1, 2, 3}};
+    if (override_prefill_tokens.has_value()) {
+      prefill_tokens = *override_prefill_tokens;
+    }
     auto decode_tokens = std::vector<std::vector<int>>{{4}, {5}, {6}};
     return std::make_unique<FakeLlmExecutor>(
         /*vocab_size=*/10,
@@ -127,7 +132,7 @@ class ExecutionManagerTest : public ::testing::Test {
 };
 
 TEST_F(ExecutionManagerTest, AddPrefillTask) {
-  CreateExecutionManager(CreateDefaultFakeLlmExecutor());
+  CreateExecutionManager(CreateDefaultFakeLlmExecutor({{{1, 2, 3, -4}}}));
   ASSERT_OK_AND_ASSIGN(auto session_config, CreateDefaultSessionConfig());
   ASSERT_OK_AND_ASSIGN(const SessionId session_id,
                        execution_manager_->RegisterNewSession(session_config));
@@ -143,19 +148,106 @@ TEST_F(ExecutionManagerTest, AddPrefillTask) {
   ASSERT_OK_AND_ASSIGN(auto input_text,
                        tokenizer_->TokenIdsToTensorBuffer({1, 2, 3}));
   inputs.push_back(InputText(std::move(input_text)));
+  inputs.push_back(InputAudioEnd());
 
   ASSERT_OK_AND_ASSIGN(const TaskId task_id,
                        execution_manager_->GetNewTaskId());
+
   ASSERT_OK(execution_manager_->AddPrefillTask(
       session_id, task_id, std::move(inputs), {},
       std::make_shared<std::atomic<bool>>(false), std::move(callback)));
 
   EXPECT_OK(execution_manager_->WaitUntilDone(task_id, absl::Seconds(3)));
 
-  EXPECT_THAT(
-      task_states,
-      ElementsAre(TaskState::kCreated, TaskState::kQueued,
-                  TaskState::kProcessing, TaskState::kDone));
+  EXPECT_THAT(task_states,
+              ElementsAre(TaskState::kCreated, TaskState::kQueued,
+                          TaskState::kProcessing, TaskState::kDone));
+}
+
+TEST_F(ExecutionManagerTest, AddPrefillTaskInvalidAudioInput) {
+  CreateExecutionManager(CreateDefaultFakeLlmExecutor());
+  ASSERT_OK_AND_ASSIGN(auto session_config, CreateDefaultSessionConfig());
+  ASSERT_OK_AND_ASSIGN(const SessionId session_id,
+                       execution_manager_->RegisterNewSession(session_config));
+
+  std::vector<TaskState> task_states;
+  absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback =
+      [&task_states](absl::StatusOr<Responses> responses) {
+        if (!responses.ok()) {
+          ASSERT_THAT(responses, testing::status::StatusIs(
+                                     absl::StatusCode::kFailedPrecondition));
+          ASSERT_THAT(responses.status().message(),
+                      testing::Eq("The audio is not a preprocessed tensor."));
+          task_states.push_back(TaskState::kFailed);
+        } else {
+          ASSERT_OK(responses);
+          task_states.push_back(responses->GetTaskState());
+        }
+      };
+
+  std::vector<InputData> inputs;
+  ASSERT_OK_AND_ASSIGN(auto input_text,
+                       tokenizer_->TokenIdsToTensorBuffer({1, 2, 3}));
+  inputs.push_back(InputText(std::move(input_text)));
+  InputAudio input_audio("");
+  inputs.push_back(std::move(input_audio));
+
+  ASSERT_OK_AND_ASSIGN(const TaskId task_id,
+                       execution_manager_->GetNewTaskId());
+
+  ASSERT_OK(execution_manager_->AddPrefillTask(
+      session_id, task_id, std::move(inputs), {},
+      std::make_shared<std::atomic<bool>>(false), std::move(callback)));
+
+  EXPECT_OK(execution_manager_->WaitUntilDone(task_id, absl::Seconds(3)));
+
+  EXPECT_THAT(task_states,
+              ElementsAre(TaskState::kCreated, TaskState::kQueued,
+                          TaskState::kProcessing, TaskState::kFailed));
+}
+
+TEST_F(ExecutionManagerTest, AddPrefillTaskInvalidImageInput) {
+  CreateExecutionManager(CreateDefaultFakeLlmExecutor());
+  ASSERT_OK_AND_ASSIGN(auto session_config, CreateDefaultSessionConfig());
+  ASSERT_OK_AND_ASSIGN(const SessionId session_id,
+                       execution_manager_->RegisterNewSession(session_config));
+
+  std::vector<TaskState> task_states;
+  absl::AnyInvocable<void(absl::StatusOr<Responses>)> callback =
+      [&task_states](absl::StatusOr<Responses> responses) {
+        if (!responses.ok()) {
+          ASSERT_THAT(responses, testing::status::StatusIs(
+                                     absl::StatusCode::kFailedPrecondition));
+          ASSERT_THAT(
+              responses.status().message(),
+              testing::Eq(
+                  "The image is not preprocessed and does not have a tensor."));
+          task_states.push_back(TaskState::kFailed);
+        } else {
+          ASSERT_OK(responses);
+          task_states.push_back(responses->GetTaskState());
+        }
+      };
+
+  std::vector<InputData> inputs;
+  ASSERT_OK_AND_ASSIGN(auto input_text,
+                       tokenizer_->TokenIdsToTensorBuffer({1, 2, 3}));
+  inputs.push_back(InputText(std::move(input_text)));
+  InputImage input_image("");
+  inputs.push_back(std::move(input_image));
+
+  ASSERT_OK_AND_ASSIGN(const TaskId task_id,
+                       execution_manager_->GetNewTaskId());
+
+  ASSERT_OK(execution_manager_->AddPrefillTask(
+      session_id, task_id, std::move(inputs), {},
+      std::make_shared<std::atomic<bool>>(false), std::move(callback)));
+
+  EXPECT_OK(execution_manager_->WaitUntilDone(task_id, absl::Seconds(3)));
+
+  EXPECT_THAT(task_states,
+              ElementsAre(TaskState::kCreated, TaskState::kQueued,
+                          TaskState::kProcessing, TaskState::kFailed));
 }
 
 TEST_F(ExecutionManagerTest, AddDecodeTaskWithInternalSampler) {

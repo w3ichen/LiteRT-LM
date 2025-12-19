@@ -205,14 +205,51 @@ class LockedLlmExecutor : public LlmExecutor {
       return absl::OkStatus();
     }
 
+    // TODO: b/409401231 - Add unit tests for the new_inputs creation.
     LITERT_ASSIGN_OR_RETURN(
         auto new_inputs_token_ids,
         CopyToTensorBuffer(
             absl::MakeConstSpan(input_ids_vec.data(), input_ids_vec.size()),
             {1, static_cast<int>(input_ids_vec.size())}));
+    std::optional<ExecutorVisionData> new_vision_data = std::nullopt;
+    std::optional<ExecutorAudioData> new_audio_data = std::nullopt;
+    if (inputs.GetVisionDataPtr().ok()) {
+      new_vision_data = ExecutorVisionData();
+      LITERT_ASSIGN_OR_RETURN(
+          auto new_vision_embeddings,
+          inputs.GetVisionEmbeddingsPtr().value()->Duplicate());
+      new_vision_data->SetEmbeddings(std::move(new_vision_embeddings));
+      if (inputs.GetVisionDataPtr().value()->GetPerLayerEmbeddingsPtr().ok()) {
+        LITERT_ASSIGN_OR_RETURN(auto new_per_layer_embeddings,
+                                inputs.GetVisionDataPtr()
+                                    .value()
+                                    ->GetPerLayerEmbeddingsPtr()
+                                    .value()
+                                    ->Duplicate());
+        new_vision_data->SetPerLayerEmbeddings(
+            std::move(new_per_layer_embeddings));
+      }
+    }
+    if (inputs.GetAudioEmbeddingsPtr().ok()) {
+      new_audio_data = ExecutorAudioData();
+      LITERT_ASSIGN_OR_RETURN(
+          auto new_audio_embeddings,
+          inputs.GetAudioEmbeddingsPtr().value()->Duplicate());
+      new_audio_data->SetEmbeddings(std::move(new_audio_embeddings));
+      if (inputs.GetAudioDataPtr().value()->GetPerLayerEmbeddingsPtr().ok()) {
+        LITERT_ASSIGN_OR_RETURN(auto new_per_layer_embeddings,
+                                inputs.GetAudioDataPtr()
+                                    .value()
+                                    ->GetPerLayerEmbeddingsPtr()
+                                    .value()
+                                    ->Duplicate());
+        new_audio_data->SetPerLayerEmbeddings(
+            std::move(new_per_layer_embeddings));
+      }
+    }
     auto new_inputs =
         ExecutorInputs(ExecutorTextData(std::move(new_inputs_token_ids)),
-                       std::nullopt, std::nullopt);
+                       std::move(new_vision_data), std::move(new_audio_data));
 
     auto new_prefill_query_params = prefill_params;
     new_prefill_query_params.SetCurrentStep(current_step);
