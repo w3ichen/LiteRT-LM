@@ -264,7 +264,7 @@ absl::Status EngineSettings::MaybeUpdateAndValidate(
   }
 
   ABSL_LOG(INFO) << "The llm metadata: " << metadata.DebugString();
-  ABSL_LOG(INFO) << "The validated engine settings: " << this;
+  ABSL_LOG(INFO) << "The validated engine settings: " << *this;
   return absl::OkStatus();
 }
 

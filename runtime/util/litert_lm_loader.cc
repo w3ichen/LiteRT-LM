@@ -187,8 +187,9 @@ absl::Status LitertLmLoader::Initialize() {
       }
       if (found_model_type) {
         ABSL_LOG(INFO) << "model_type: " << model_type;
-        buffer_key = BufferKey(section->data_type(),
-                               StringToModelType(model_type).value());
+        ASSIGN_OR_RETURN(ModelType model_type_enum,
+                         StringToModelType(model_type));
+        buffer_key = BufferKey(section->data_type(), model_type_enum);
       } else {
         ABSL_LOG(WARNING) << "model_type not found, use kTfLitePrefillDecode";
         // For backward compatibility, we will use the default model type if

@@ -558,10 +558,8 @@ absl::Status RunLiteRtLm(const LiteRtLmSettings& settings) {
             kMemoryCheckIntervalMs);
     mem_monitor->Start();
   }
-
   ASSIGN_OR_RETURN(EngineSettings engine_settings,
                    CreateEngineSettings(settings));
-
   ABSL_LOG(INFO) << "Creating engine";
   ASSIGN_OR_RETURN(auto engine,
                    litert::lm::Engine::CreateEngine(std::move(engine_settings),
