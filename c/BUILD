@@ -24,6 +24,16 @@ package(
 
 licenses(["notice"])
 
+config_setting(
+    name = "use_legacy_engine",
+    values = {"copt": "-DUSE_LEGACY_ENGINE"},
+)
+
+config_setting(
+    name = "use_advanced_legacy_engine",
+    values = {"copt": "-DUSE_ADVANCED_LEGACY_ENGINE"},
+)
+
 cc_library(
     name = "engine",
     srcs = [
@@ -51,14 +61,15 @@ cc_library(
         "@litert//litert/c/internal:litert_logging",
         "//runtime/conversation",
         "//runtime/conversation:io_types",
-        "//runtime/core:engine_impl",  # buildcleaner: keep
         "//runtime/engine:engine_interface",
         "//runtime/engine:engine_settings",
         "//runtime/engine:io_types",
         "//runtime/executor:executor_settings_base",
         "//runtime/proto:engine_cc_proto",
         "//runtime/proto:sampler_params_cc_proto",
-    ],
+    ] + select({
+        "//conditions:default": ["//runtime/core:engine_impl"],
+    }),
 )
 
 cc_test(
