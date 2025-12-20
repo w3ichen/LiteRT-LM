@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <memory>
 #include <optional>
+#include <random>
 #include <utility>
 
 #include "absl/base/attributes.h"  // from @com_google_absl
@@ -60,6 +61,11 @@ extern "C" int (*LiteRtTopKOpenClSampler_SampleToIdAndScoreBuffer_Static)(
     LiteRtTensorBuffer ids_tensor, const LiteRtTensorBuffer* scores_tensor,
     char** error_msg) = nullptr;
 
+extern "C" int (*LiteRtTopKOpenClSampler_UpdateConfig_Static)(
+    LiteRtTopKSampler_Sampler* sampler,
+    const LiteRtTopKSampler_SamplerParameters* sampler_params, int batch_size,
+    std::default_random_engine* rand_gen, char** error_msg) = nullptr;
+
 // WebGPU Sampler C API function pointers.
 extern "C" int (*LiteRtTopKWebGpuSampler_Create_Static)(
     LiteRtEnvironment env, int batch_size, int vocab_size,
@@ -74,6 +80,11 @@ extern "C" int (*LiteRtTopKWebGpuSampler_SampleToIdAndScoreBuffer_Static)(
     LiteRtTopKSampler_Sampler* sampler, LiteRtTensorBuffer logits_tensor,
     LiteRtTensorBuffer ids_tensor, const LiteRtTensorBuffer* scores_tensor,
     char** error_msg) = nullptr;
+
+extern "C" int (*LiteRtTopKWebGpuSampler_UpdateConfig_Static)(
+    LiteRtTopKSampler_Sampler* sampler,
+    const LiteRtTopKSampler_SamplerParameters* sampler_params, int batch_size,
+    std::default_random_engine* rand_gen, char** error_msg) = nullptr;
 
 absl::Status CreateStatus(int error_code, const char* error_msg) {
   absl::StatusCode code = static_cast<absl::StatusCode>(error_code);
@@ -102,21 +113,29 @@ class TopKCApiSampler : public Sampler {
               LiteRtTensorBuffer logits_tensor, LiteRtTensorBuffer ids_tensor,
               const LiteRtTensorBuffer* absl_nullable scores_tensor,
               char** absl_nullable error_msg);
+  using LiteRtTopKSampler_UpdateConfig = int (*)(
+      LiteRtTopKSampler_Sampler* sampler,
+      const LiteRtTopKSampler_SamplerParameters* sampler_params, int batch_size,
+      std::default_random_engine* absl_nullable rand_gen,
+      char** absl_nullable error_msg);
 
   struct TopKSamplerCApi {
     std::optional<SharedLibrary> lib;
     LiteRtTopKSampler_Create create_func;
     LiteRtTopKSampler_Destroy destroy_func;
     LiteRtTopKSampler_SampleToIdAndScoreBuffer sample_func;
+    LiteRtTopKSampler_UpdateConfig update_config_func;
 
     TopKSamplerCApi(std::optional<SharedLibrary> lib,
                     LiteRtTopKSampler_Create create_func,
                     LiteRtTopKSampler_Destroy destroy_func,
-                    LiteRtTopKSampler_SampleToIdAndScoreBuffer sample_func)
+                    LiteRtTopKSampler_SampleToIdAndScoreBuffer sample_func,
+                    LiteRtTopKSampler_UpdateConfig update_config_func)
         : lib(std::move(lib)),
           create_func(create_func),
           destroy_func(destroy_func),
-          sample_func(sample_func) {}
+          sample_func(sample_func),
+          update_config_func(update_config_func) {}
   };
 
   ~TopKCApiSampler() override { capi_->destroy_func(sampler_); }
@@ -135,6 +154,15 @@ class TopKCApiSampler : public Sampler {
     return CreateStatusAndFreeErrorMsg(error_code, error_msg);
   }
 
+  absl::Status UpdateConfig(
+      const proto::SamplerParameters& sampler_params, int batch_size,
+      std::shared_ptr<std::default_random_engine> rand_gen) override {
+    char* error_msg = nullptr;
+    int error_code = capi_->update_config_func(
+        sampler_, &sampler_params, batch_size, rand_gen.get(), &error_msg);
+    return CreateStatusAndFreeErrorMsg(error_code, error_msg);
+  }
+
  protected:
   TopKCApiSampler(std::unique_ptr<TopKSamplerCApi> capi,
                   LiteRtTopKSampler_Sampler* sampler)
@@ -142,7 +170,8 @@ class TopKCApiSampler : public Sampler {
 
   static absl::StatusOr<std::unique_ptr<TopKSamplerCApi>> GetSamplerCApi(
       const char* lib_name, const char* create_func_name,
-      const char* destroy_func_name, const char* sample_func_name) {
+      const char* destroy_func_name, const char* sample_func_name,
+      const char* update_config_func_name) {
     // Load Sampler C API library and get the symbols.
     LITERT_ASSIGN_OR_RETURN(
         auto lib, SharedLibrary::Load(lib_name, RtldFlags::Lazy().Local()));
@@ -160,11 +189,14 @@ class TopKCApiSampler : public Sampler {
         auto sampler_sample_func,
         lib.LookupSymbol<LiteRtTopKSampler_SampleToIdAndScoreBuffer>(
             sample_func_name));
+    LITERT_ASSIGN_OR_RETURN(auto sampler_update_config_func,
+                            lib.LookupSymbol<LiteRtTopKSampler_UpdateConfig>(
+                                update_config_func_name));
     RET_CHECK_NE(sampler_sample_func, nullptr)
         << "Failed to load " << sample_func_name;
     return std::make_unique<TopKSamplerCApi>(
         std::move(lib), sampler_create_func, sampler_destroy_func,
-        sampler_sample_func);
+        sampler_sample_func, sampler_update_config_func);
   }
 
   std::unique_ptr<TopKSamplerCApi> capi_;
@@ -182,7 +214,8 @@ class TopKOpenClCApiSampler : public TopKCApiSampler {
     auto capi_or = GetSamplerCApi(
         "libLiteRtTopKOpenClSampler.so", "LiteRtTopKOpenClSampler_Create",
         "LiteRtTopKOpenClSampler_Destroy",
-        "LiteRtTopKOpenClSampler_SampleToIdAndScoreBuffer");
+        "LiteRtTopKOpenClSampler_SampleToIdAndScoreBuffer",
+        "LiteRtTopKOpenClSampler_UpdateConfig");
     if (capi_or.ok()) {
       capi = std::move(capi_or.value());
       ABSL_LOG(INFO) << "Dynamically loaded LiteRtTopKOpenClSampler C API.";
@@ -222,14 +255,16 @@ class TopKOpenClCApiSampler : public TopKCApiSampler {
   GetStaticTopKOpenClSamplerCApi() {
     if (LiteRtTopKOpenClSampler_Create_Static == nullptr ||
         LiteRtTopKOpenClSampler_Destroy_Static == nullptr ||
-        LiteRtTopKOpenClSampler_SampleToIdAndScoreBuffer_Static == nullptr) {
+        LiteRtTopKOpenClSampler_SampleToIdAndScoreBuffer_Static == nullptr ||
+        LiteRtTopKOpenClSampler_UpdateConfig_Static == nullptr) {
       return absl::UnavailableError(
           "Static LiteRtTopKOpenClSampler C API not available.");
     }
     return std::make_unique<TopKSamplerCApi>(
         /*lib=*/std::nullopt, LiteRtTopKOpenClSampler_Create_Static,
         LiteRtTopKOpenClSampler_Destroy_Static,
-        LiteRtTopKOpenClSampler_SampleToIdAndScoreBuffer_Static);
+        LiteRtTopKOpenClSampler_SampleToIdAndScoreBuffer_Static,
+        LiteRtTopKOpenClSampler_UpdateConfig_Static);
   }
 };
 
@@ -251,7 +286,8 @@ class TopKWebGpuCApiSampler : public TopKCApiSampler {
     auto capi_or = GetSamplerCApi(
         "libLiteRtTopKWebGpuSampler" SO_EXT, "LiteRtTopKWebGpuSampler_Create",
         "LiteRtTopKWebGpuSampler_Destroy",
-        "LiteRtTopKWebGpuSampler_SampleToIdAndScoreBuffer");
+        "LiteRtTopKWebGpuSampler_SampleToIdAndScoreBuffer",
+        "LiteRtTopKWebGpuSampler_UpdateConfig");
     if (capi_or.ok()) {
       capi = std::move(capi_or.value());
       ABSL_LOG(INFO) << "Dynamically loaded LiteRtTopKWebGpuSampler C API.";
@@ -291,14 +327,16 @@ class TopKWebGpuCApiSampler : public TopKCApiSampler {
   GetStaticTopKWebGpuSamplerCApi() {
     if (LiteRtTopKWebGpuSampler_Create_Static == nullptr ||
         LiteRtTopKWebGpuSampler_Destroy_Static == nullptr ||
-        LiteRtTopKWebGpuSampler_SampleToIdAndScoreBuffer_Static == nullptr) {
+        LiteRtTopKWebGpuSampler_SampleToIdAndScoreBuffer_Static == nullptr ||
+        LiteRtTopKWebGpuSampler_UpdateConfig_Static == nullptr) {
       return absl::UnavailableError(
           "Static LiteRtTopKWebGpuSampler C API not available.");
     }
     return std::make_unique<TopKSamplerCApi>(
         /*lib=*/std::nullopt, LiteRtTopKWebGpuSampler_Create_Static,
         LiteRtTopKWebGpuSampler_Destroy_Static,
-        LiteRtTopKWebGpuSampler_SampleToIdAndScoreBuffer_Static);
+        LiteRtTopKWebGpuSampler_SampleToIdAndScoreBuffer_Static,
+        LiteRtTopKWebGpuSampler_UpdateConfig_Static);
   }
 };
 

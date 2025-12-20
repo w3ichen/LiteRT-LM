@@ -17,13 +17,13 @@
 
 #include <memory>
 #include <random>
-#include <utility>
 #include <vector>
 
 #include "absl/status/status.h"  // from @com_google_absl
 #include "absl/status/statusor.h"  // from @com_google_absl
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
 #include "runtime/components/sampler.h"
+#include "runtime/proto/sampler_params.pb.h"
 
 namespace litert::lm {
 
@@ -49,6 +49,11 @@ class TopPSampler : public Sampler {
                                         TensorBuffer& ids_tensor,
                                         TensorBuffer* scores_tensor) override;
 
+  // Updates the configs of the sampler.
+  absl::Status UpdateConfig(
+      const proto::SamplerParameters& sampler_params, int batch_size,
+      std::shared_ptr<std::default_random_engine> rand_gen) override;
+
  private:
   explicit TopPSampler(int k, float p, float temperature, int batch_size,
                        int seed)
@@ -57,10 +62,10 @@ class TopPSampler : public Sampler {
   }
 
   // The parameters for the sampler.
-  const int k_;
-  const float p_;
-  const float temperature_;
-  const int batch_size_;
+  int k_;
+  float p_;
+  float temperature_;
+  int batch_size_;
   std::shared_ptr<std::default_random_engine> generator_;
 
   // The logits data to be used for sampling. Having it as a member to avoid

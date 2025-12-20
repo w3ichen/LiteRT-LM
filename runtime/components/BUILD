@@ -131,7 +131,10 @@ cc_library(
 cc_library(
     name = "sampler",
     hdrs = ["sampler.h"],
-    deps = ["@com_google_absl//absl/status"] + select({
+    deps = [
+        "@com_google_absl//absl/status",
+        "//runtime/proto:sampler_params_cc_proto",
+    ] + select({
         "@litert//litert:litert_link_capi_so": [
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
@@ -301,7 +304,7 @@ cc_library(
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-        "@litert//litert/cc:litert_element_type",
+        "//runtime/proto:sampler_params_cc_proto",
         "//runtime/util:convert_tensor_buffer",
         "//runtime/util:tensor_buffer_util",
         "@litert//tflite/types:half",
@@ -310,6 +313,7 @@ cc_library(
             "@litert//litert/cc:litert_api_with_dynamic_runtime",
         ],
         "//conditions:default": [
+            "@litert//litert/cc:litert_element_type",
             "@litert//litert/cc:litert_macros",
             "@litert//litert/cc:litert_tensor_buffer",
         ],
@@ -330,6 +334,7 @@ cc_test(
         "@litert//litert/cc:litert_macros",
         "@litert//litert/cc:litert_ranked_tensor_type",
         "@litert//litert/cc:litert_tensor_buffer",
+        "//runtime/proto:sampler_params_cc_proto",
         "//runtime/util:convert_tensor_buffer",
         "@litert//tflite/types:half",
     ],

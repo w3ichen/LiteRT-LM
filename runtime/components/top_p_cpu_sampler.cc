@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -145,6 +146,19 @@ absl::Status TopPSampler::SampleToIdAndScoreBuffer(
       scores[i] = std::log(sampled_scores[i]);
     }
     scores_tensor->Write(absl::MakeConstSpan(scores));
+  }
+  return absl::OkStatus();
+}
+
+absl::Status TopPSampler::UpdateConfig(
+    const proto::SamplerParameters& sampler_params, int batch_size,
+    std::shared_ptr<std::default_random_engine> rand_gen) {
+  k_ = sampler_params.k();
+  p_ = sampler_params.p();
+  temperature_ = sampler_params.temperature();
+  batch_size_ = batch_size;
+  if (rand_gen != nullptr) {
+    generator_ = rand_gen;
   }
   return absl::OkStatus();
 }

@@ -31,6 +31,7 @@
 #include "litert/cc/litert_macros.h"  // from @litert
 #include "litert/cc/litert_ranked_tensor_type.h"  // from @litert
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
+#include "runtime/proto/sampler_params.pb.h"
 #include "runtime/util/convert_tensor_buffer.h"  // IWYU pragma: keep
 #include "tflite/types/half.h"  // from @litert
 
@@ -198,6 +199,57 @@ TEST(TopPSamplerTest, SampleToIdAndScoreBufferFp16_BatchSize2) {
   ASSERT_TRUE(scores.HasValue());
   // The scores are the log of the probability of the sampled token.
   EXPECT_THAT(*scores, ElementsAre(std::log(1.0f), std::log(1.0f)));
+}
+
+TEST(TopPSamplerTest, UpdateConfig) {
+  auto sampler_or = TopPSampler::Create(/*k=*/1, /*p=*/0.5, /*temperature=*/1.0,
+                                        /*batch_size=*/1, /*seed=*/2);
+  ASSERT_TRUE(sampler_or.ok());
+  auto sampler = *std::move(sampler_or);
+
+  proto::SamplerParameters sampler_params;
+  sampler_params.set_k(1);
+  sampler_params.set_p(1.0);
+  sampler_params.set_temperature(100.0);
+
+  auto status = sampler->UpdateConfig(sampler_params,
+                                      /*batch_size=*/1, nullptr);
+  ASSERT_TRUE(status.ok());
+
+  const std::vector<float> logits = {0.0, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0};
+  auto logits_tensor = CopyToTensorBuffer<float>(logits, {1, 8});
+
+  std::vector<int> ids_vector = {0, 1, 2, 3, 4, 5, 6, 7};
+  auto ids_tensor =
+      CopyToTensorBuffer<int>(absl::MakeConstSpan(ids_vector), {1, 8});
+  ASSERT_TRUE(ids_tensor.HasValue());
+
+  status = sampler->SampleToIdAndScoreBuffer(*logits_tensor,
+                                              ids_tensor.Value(),
+                                              /*scores_tensor=*/nullptr);
+  ASSERT_TRUE(status.ok());
+
+  auto ids = CopyFromTensorBuffer<int>(ids_tensor.Value());
+  ASSERT_TRUE(ids.HasValue());
+  // With topk=1, it should pick the argmax.
+  EXPECT_EQ(ids.Value()[0], 4);
+
+  // Update the config again.
+  sampler_params.set_k(8);
+
+  status = sampler->UpdateConfig(sampler_params, /*batch_size=*/1, nullptr);
+  ASSERT_TRUE(status.ok());
+
+  status = sampler->SampleToIdAndScoreBuffer(*logits_tensor,
+                                              ids_tensor.Value(),
+                                              /*scores_tensor=*/nullptr);
+  ASSERT_TRUE(status.ok());
+
+  ids = CopyFromTensorBuffer<int>(ids_tensor.Value());
+
+  // With topk=8 and high temperature, it might pick a random token. With
+  // seed=2, it should consistently not pick 4.
+  EXPECT_NE(ids.Value()[0], 4);
 }
 
 }  // namespace

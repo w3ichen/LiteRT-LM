@@ -15,8 +15,12 @@
 #ifndef THIRD_PARTY_ODML_LITERT_LM_RUNTIME_COMPONENTS_SAMPLER_H_
 #define THIRD_PARTY_ODML_LITERT_LM_RUNTIME_COMPONENTS_SAMPLER_H_
 
+#include <memory>
+#include <random>
+
 #include "absl/status/status.h"  // from @com_google_absl
 #include "litert/cc/litert_tensor_buffer.h"  // from @litert
+#include "runtime/proto/sampler_params.pb.h"
 
 namespace litert::lm {
 
@@ -34,6 +38,11 @@ class Sampler {
   virtual absl::Status SampleToIdAndScoreBuffer(
       const TensorBuffer& logits_tensor, TensorBuffer& ids_tensor,
       TensorBuffer* scores_tensor) = 0;
+
+  // Updates the configs of the sampler.
+  virtual absl::Status UpdateConfig(
+      const proto::SamplerParameters& sampler_params, int batch_size,
+      std::shared_ptr<std::default_random_engine> rand_gen) = 0;
 };
 
 }  // namespace litert::lm
