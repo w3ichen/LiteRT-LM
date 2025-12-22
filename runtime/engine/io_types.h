@@ -230,7 +230,7 @@ inline absl::StatusOr<InputData> CreateInputDataCopy(const InputData& data) {
     return input_image->CreateCopy();
   } else if (const auto* input_audio = std::get_if<InputAudio>(&data)) {
     return input_audio->CreateCopy();
-  } else if (const auto* input_audio_end = std::get_if<InputAudioEnd>(&data)) {
+  } else if (std::get_if<InputAudioEnd>(&data)) {
     return InputAudioEnd();
   }
   return absl::FailedPreconditionError(
