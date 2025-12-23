@@ -216,7 +216,8 @@ absl::Status EngineSettings::MaybeUpdateAndValidate(
     Backend backend = main_executor_settings_.GetBackend();
     if (backend == Backend::NPU || backend == Backend::GPU_ARTISAN) {
       sampler_params.set_type(proto::SamplerParameters::TYPE_UNSPECIFIED);
-    } else if (backend == Backend::CPU || backend == Backend::GPU) {
+    } else if (backend == Backend::CPU || backend == Backend::GPU
+    ) {
       sampler_params.set_type(proto::SamplerParameters::TOP_P);
       sampler_params.set_k(1);
       sampler_params.set_p(0.95f);
@@ -240,8 +241,8 @@ absl::Status EngineSettings::MaybeUpdateAndValidate(
                                                    metadata.llm_model_type()));
   }
 
-  // If the executor settings is set, then check if the input backend constraint
-  // is compatible with the executor settings.
+  // If the executor settings is set, then check if the input backend
+  // constraint is compatible with the executor settings.
   RETURN_IF_ERROR(ValidateBackendConstraint(main_executor_settings_,
                                             text_backend_constraint, "Main"));
 
