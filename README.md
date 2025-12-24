@@ -9,13 +9,14 @@ components working together. LiteRT-LM builds on top of
 [LiteRT](https://github.com/google-ai-edge/LiteRT) to enable these pipelines
 including:
 
-*   **C++ api** to efficiently run language models
-*   **Cross-Platform** support via portable C++ for broad deployment scenarios
-*   **Flexible** so you can customize for your specific feature
-*   **Hardware Acceleration** to unlock the full potential of your device's
-    hardware
+- **C++ api** to efficiently run language models
+- **Cross-Platform** support via portable C++ for broad deployment scenarios
+- **Flexible** so you can customize for your specific feature
+- **Hardware Acceleration** to unlock the full potential of your device's
+  hardware
 
 ### Status: Early Preview
+
 Full release is coming soon.
 We heard the community feedback regarding Google AI Edge's Gemma 3n LiteRT
 preview. You want access on more platforms, more visibility into the underlying
@@ -23,83 +24,86 @@ stack, and more flexibility. LiteRT-LM can help with all three.
 
 ### 🚀 What's New
 
-*   ***Nov 2025*** **: Desktop GPU support and more (`v0.8.0`)**
-    - Desktop GPU support.
-    - Simple CLI for Desktop: [Link to Quick Start section](#quick_start)
-    - Multi-Modality support: Vision and Audio input are supported when models
-      support it. [See more details here](#multimodal)
-    - Kotlin API for Android and JVM (Linux, MacOS, Windows): [Link to LiteRT-LM
-      Kotlin API](./kotlin/README.md)
-    - Conversation API: [Link to Conversation API](./docs/conversation.md)
-    - Function calling support: [Link to Tool Use](./docs/tool_use.md)
+- **_Nov 2025_** **: Desktop GPU support and more (`v0.8.0`)**
 
-*   ***June 24, 2025*** **: Run Gemma models with NPU Support (`v0.7.0`)**
-    Unlock significant performance gains! Our latest release leverages the power
-    of Neural Processing Units (NPUs) on devices with Qualcomm and MediaTek
-    chipsets to run the Gemma3 1B model with incredible efficiency.
+  - Desktop GPU support.
+  - Simple CLI for Desktop: [Link to Quick Start section](#quick_start)
+  - Multi-Modality support: Vision and Audio input are supported when models
+    support it. [See more details here](#multimodal)
+  - Kotlin API for Android and JVM (Linux, MacOS, Windows): [Link to LiteRT-LM
+    Kotlin API](./kotlin/README.md)
+  - Conversation API: [Link to Conversation API](./docs/conversation.md)
+  - Function calling support: [Link to Tool Use](./docs/tool_use.md)
 
-    **Note:** LiteRT-LM NPU acceleration is only available through an Early
-    Access Program. Please check out [this
-    page](https://ai.google.dev/edge/litert/next/npu) for more information about
-    how to sign it up.
-*   ***June 10, 2025*** **: The Debut of LiteRT-LM: A New Framework for
-    On-Device LLMs** We're proud to release an early preview (`v0.6.1`) of the
-    LiteRT-LM codebase! This foundational release enables you to run the latest
-    Gemma series models across a wide range of devices with initial support for
-    CPU execution and powerful GPU acceleration on Android.
+- **_June 24, 2025_** **: Run Gemma models with NPU Support (`v0.7.0`)**
+  Unlock significant performance gains! Our latest release leverages the power
+  of Neural Processing Units (NPUs) on devices with Qualcomm and MediaTek
+  chipsets to run the Gemma3 1B model with incredible efficiency.
+
+  **Note:** LiteRT-LM NPU acceleration is only available through an Early
+  Access Program. Please check out [this
+  page](https://ai.google.dev/edge/litert/next/npu) for more information about
+  how to sign it up.
+
+- **_June 10, 2025_** **: The Debut of LiteRT-LM: A New Framework for
+  On-Device LLMs** We're proud to release an early preview (`v0.6.1`) of the
+  LiteRT-LM codebase! This foundational release enables you to run the latest
+  Gemma series models across a wide range of devices with initial support for
+  CPU execution and powerful GPU acceleration on Android.
 
 ### Supported Backends & Platforms
 
-Platform     | CPU Support | GPU Support | NPU Support |
-:----------- | :---------: | :-----------: | :-----------:
-**Android**  | ✅           | ✅            | ✅ |
-**macOS**    | ✅           | ✅            | - |
-**Windows**  | ✅           | ✅            | - |
-**Linux**    | ✅           | ✅            | - |
-**Embedded** | ✅           | -             | - |
+| Platform     | CPU Support | GPU Support | NPU Support |
+| :----------- | :---------: | :---------: | :---------: |
+| **Android**  |     ✅      |     ✅      |     ✅      |
+| **macOS**    |     ✅      |     ✅      |      -      |
+| **Windows**  |     ✅      |     ✅      |      -      |
+| **Linux**    |     ✅      |     ✅      |      -      |
+| **Embedded** |     ✅      |      -      |      -      |
 
 ### Supported Models and Performance
 
 Currently supported models during our Preview (as `.litertlm` format).
 
-| Model               | Usage Type                     | Quantization      | Context size | Model Size (Mb) | Give it a try                                                                                                                                                             |
-| :------------------ | :----------------------------- | :---------------- | :----------- | :-------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Gemma3-1B           | Chat Ready                     | 4-bit per-channel | 4096         | 557             | [Download](https://huggingface.co/litert-community/Gemma3-1B-IT/blob/main/Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm)                                             |
-| Gemma-3n-E2B        | Chat Ready                     | 4-bit per-channel | 4096         | 2965            | [Download](https://huggingface.co/google/gemma-3n-E2B-it-litert-lm-preview)                                                                                               |
-| Gemma-3n-E4B        | Chat Ready                     | 4-bit per-channel | 4096         | 4235            | [Download](https://huggingface.co/google/gemma-3n-E4B-it-litert-lm-preview)                                                                                               |
-| phi-4-mini          | Chat Ready                     | 8-bit per-channel | 4096         | 3728            | [Download](https://huggingface.co/litert-community/Phi-4-mini-instruct/resolve/main/Phi-4-mini-instruct_multi-prefill-seq_q8_ekv4096.litertlm)                            |
-| qwen2.5-1.5b        | Chat Ready                     | 8-bit per-channel | 4096         | 1524            | [Download](https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm)                        |
-| FunctionGemma-270M  | Base (Fine-tuning required)    | 8-bit per-channel | 1024         | 288             | [Fine-tuning Guide](https://ai.google.dev/gemma/docs/mobile-actions)                                                                                                      |
-| ↪ TinyGarden-270M   | Demo                           | 8-bit per-channel | 1024         | 288             | [Download](https://huggingface.co/google/functiongemma-270m-it/blob/main/tiny_garden.litertlm) / [Try App](https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery&hl=en_US) |
+| Model              | Usage Type                  | Quantization      | Context size | Model Size (Mb) | Give it a try                                                                                                                                                                                 |
+| :----------------- | :-------------------------- | :---------------- | :----------- | :-------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemma3-1B          | Chat Ready                  | 4-bit per-channel | 4096         | 557             | [Download](https://huggingface.co/litert-community/Gemma3-1B-IT/blob/main/Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.litertlm)                                                                 |
+| Gemma-3n-E2B       | Chat Ready                  | 4-bit per-channel | 4096         | 2965            | [Download](https://huggingface.co/google/gemma-3n-E2B-it-litert-lm-preview)                                                                                                                   |
+| Gemma-3n-E4B       | Chat Ready                  | 4-bit per-channel | 4096         | 4235            | [Download](https://huggingface.co/google/gemma-3n-E4B-it-litert-lm-preview)                                                                                                                   |
+| phi-4-mini         | Chat Ready                  | 8-bit per-channel | 4096         | 3728            | [Download](https://huggingface.co/litert-community/Phi-4-mini-instruct/resolve/main/Phi-4-mini-instruct_multi-prefill-seq_q8_ekv4096.litertlm)                                                |
+| qwen2.5-1.5b       | Chat Ready                  | 8-bit per-channel | 4096         | 1524            | [Download](https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm)                                            |
+| FunctionGemma-270M | Base (Fine-tuning required) | 8-bit per-channel | 1024         | 288             | [Fine-tuning Guide](https://ai.google.dev/gemma/docs/mobile-actions)                                                                                                                          |
+| ↪ TinyGarden-270M  | Demo                        | 8-bit per-channel | 1024         | 288             | [Download](https://huggingface.co/google/functiongemma-270m-it/blob/main/tiny_garden.litertlm) / [Try App](https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery&hl=en_US) |
 
 Below are the performance numbers of running each model on various devices. Note
 that the benchmark is measured with 1024 tokens prefill and 256 tokens decode (
 with performance lock on Android devices).
 
-| Model | Device | Backend | Prefill (tokens/sec) | Decode (tokens/sec) | Context size |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| Gemma3-1B | MacBook Pro<br>(2023 M3) | CPU | 422.98 | 66.89 | 4096 |
-| Gemma3-1B | Samsung S24<br>(Ultra) | CPU | 243.24 | 43.56 | 4096 |
-| Gemma3-1B | Samsung S24<br>(Ultra) | GPU | 1876.5 | 44.57 | 4096 |
-| Gemma3-1B | Samsung S25<br>(Ultra) | NPU | 5836.6 | 84.8 | 1280 |
-| Gemma-3n-E2B | MacBook Pro<br>(2023 M3) | CPU | 232.5 | 27.6 | 4096 |
-| Gemma-3n-E2B | Samsung S24<br>(Ultra) | CPU | 110.5 | 16.1 | 4096 |
-| Gemma-3n-E2B | Samsung S24<br>(Ultra) | GPU | 816.4 | 15.6 | 4096 |
-| Gemma-3n-E4B | MacBook Pro<br>(2023 M3) | CPU | 170.1 | 20.1 | 4096 |
-| Gemma-3n-E4B | Samsung S24<br>(Ultra) | CPU | 73.5 | 9.2 | 4096 |
-| Gemma-3n-E4B | Samsung S24<br>(Ultra) | GPU | 548.0 | 9.4 | 4096 |
-| FunctionGemma | Samsung S25<br>(Ultra) | CPU | 1718.4 | 125.9 | 1024 |
+| Model         | Device                   | Backend | Prefill (tokens/sec) | Decode (tokens/sec) | Context size |
+| :------------ | :----------------------- | :------ | :------------------- | :------------------ | :----------- |
+| Gemma3-1B     | MacBook Pro<br>(2023 M3) | CPU     | 422.98               | 66.89               | 4096         |
+| Gemma3-1B     | Samsung S24<br>(Ultra)   | CPU     | 243.24               | 43.56               | 4096         |
+| Gemma3-1B     | Samsung S24<br>(Ultra)   | GPU     | 1876.5               | 44.57               | 4096         |
+| Gemma3-1B     | Samsung S25<br>(Ultra)   | NPU     | 5836.6               | 84.8                | 1280         |
+| Gemma-3n-E2B  | MacBook Pro<br>(2023 M3) | CPU     | 232.5                | 27.6                | 4096         |
+| Gemma-3n-E2B  | Samsung S24<br>(Ultra)   | CPU     | 110.5                | 16.1                | 4096         |
+| Gemma-3n-E2B  | Samsung S24<br>(Ultra)   | GPU     | 816.4                | 15.6                | 4096         |
+| Gemma-3n-E4B  | MacBook Pro<br>(2023 M3) | CPU     | 170.1                | 20.1                | 4096         |
+| Gemma-3n-E4B  | Samsung S24<br>(Ultra)   | CPU     | 73.5                 | 9.2                 | 4096         |
+| Gemma-3n-E4B  | Samsung S24<br>(Ultra)   | GPU     | 548.0                | 9.4                 | 4096         |
+| FunctionGemma | Samsung S25<br>(Ultra)   | CPU     | 1718.4               | 125.9               | 1024         |
 
 ## Quick Start <span id="quick_start"></span>
 
 **Want to try it out first?** Before proceeding with the full setup, you can use
 the pre-built binary below to run the LiteRT-LM immediately.
+
 ### Desktop CLI (LIT)
 
--   [MacOS ARM64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.8.0/lit.macos_arm64)
--   [Linux x86_64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.8.0/lit.linux_x86_64)
--   [Linux ARM64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.8.0/lit.linux_arm64)
--   [Windows x86_64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.8.0/lit.windows_x86_64.exe)
+- [MacOS ARM64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.8.0/lit.macos_arm64)
+- [Linux x86_64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.8.0/lit.linux_x86_64)
+- [Linux ARM64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.8.0/lit.linux_arm64)
+- [Windows x86_64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.8.0/lit.windows_x86_64.exe)
 
 After the download the `lit` binary, just run `lit` to see the options.
 Simple use case is like:
@@ -109,13 +113,14 @@ lit list --show_all
 lit pull gemma3-1b --hf_token="**your huggingface token**"
 lit run gemma3-1b [--backend=<cpu|gpu>]
 ```
+
 Note: **Running GPU on Windows needs DirectXShaderCompiler**
- <span id="windows_gpu"></span>
- Download the dxc_2025_07_14.zip or the latest zip file from
- https://github.com/microsoft/DirectXShaderCompiler/releases, unzip the file and
- locate the right architecture directory under `bin`, copy the `dxil.dll` and
- `dxcompiler.dll` into the same directory as the executable like `lit` or
- `litert_lm_main`.
+<span id="windows_gpu"></span>
+Download the dxc_2025_07_14.zip or the latest zip file from
+https://github.com/microsoft/DirectXShaderCompiler/releases, unzip the file and
+locate the right architecture directory under `bin`, copy the `dxil.dll` and
+`dxcompiler.dll` into the same directory as the executable like `lit` or
+`litert_lm_main`.
 
 Tip: For more functionality, use `lit --help` or `lit <command> --help`
 
@@ -128,8 +133,8 @@ Privacy & Security > Security** to approve the binary.
 
 ### Mobile Apps
 
--   [Android AI Edge Gallery App](https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery&hl=en_US&pli=1)
--   iOS (Coming soon)
+- [Android AI Edge Gallery App](https://play.google.com/store/apps/details?id=com.google.ai.edge.gallery&hl=en_US&pli=1)
+- iOS (Coming soon)
 
 Note that the LiteRT-LM runtime is designed to work
 with models in the `.litertlm` format. You can find and download compatible
@@ -142,14 +147,15 @@ optimally on your particular device. Subsequent loads will be faster
 because the optimized weights are cached on your device.
 
 ## Build and Run
+
 This guide provides the necessary steps to build and execute a Large Language
 Model (LLM) on your device.
 Follow the instructions below to build and run the sample code.
 
 ### Prerequisites
 
--   **Git**: To clone the repository and manage versions.
--   **Bazel (version 7.6.1)**: This project uses `bazel` as its build system.
+- **Git**: To clone the repository and manage versions.
+- **Bazel (version 7.6.1)**: This project uses `bazel` as its build system.
 
 #### Get the Source Code
 
@@ -211,12 +217,12 @@ device and your development platform.
 > Note: In order to run on GPU on all platforms, we need to take extra steps:
 >
 > 1. Add `--define=litert_link_capi_so=true`
-  `--define=resolve_symbols_in_exec=false` in the build command.
+>    `--define=resolve_symbols_in_exec=false` in the build command.
 > 2. `mkdir -p <test_dir>; cp <your litert_lm_main> <test_dir>; cp ./prebuilt/<your OS>/<shared libaries> <test_dir>/`
- and make sure the prebuilt .so/.dll/.dylib files are in the same directory as
-  `litert_lm_main` binary
+>    and make sure the prebuilt .so/.dll/.dylib files are in the same directory as
+>    `litert_lm_main` binary
 > 3. Running GPU on Windows needs DirectXShaderCompiler. See
- [this Note](#windows_gpu) for more details.
+>    [this Note](#windows_gpu) for more details.
 
 <details>
 <summary><strong>Deploy to Windows</strong></summary>
@@ -226,14 +232,14 @@ Building on Windows requires several prerequisites to be installed first.
 #### Prerequisites
 
 1.  **Visual Studio 2022** - Download from
-https://visualstudio.microsoft.com/downloads/ and install. Make sure it install
-the MSVC toolchain for all users, usually under this directory C:\Program Files.
+    https://visualstudio.microsoft.com/downloads/ and install. Make sure it install
+    the MSVC toolchain for all users, usually under this directory C:\Program Files.
 2.  **Git for Windows** - Install from https://git-scm.com/download/win
     (includes Git Bash needed for flatbuffer generation scripts).
 3.  **Python 3.13** - Download from https://www.python.org/downloads/ and
-install for all users.
+    install for all users.
 4.  **Bazel** - Install using Windows Package Manager (winget): `powershell
-    winget install --id=Bazel.Bazelisk -e`.
+winget install --id=Bazel.Bazelisk -e`.
 5.  **Java** - Install from https://www.oracle.com/java/technologies/downloads/
     and set JAVA_HOME to point at the jdk directory.
 6.  **Enable long path** Make sure the LongPathsEnabled is true in the Registry.
@@ -350,19 +356,19 @@ To be able to build the binary for Android, one needs to install NDK r28b or
 newer from https://developer.android.com/ndk/downloads#stable-downloads.
 Specific steps are:
 
--   Download the `.zip` file from
-    https://developer.android.com/ndk/downloads#stable-downloads.
--   Unzip the `.zip` file to your preferred location (say
-    `/path/to/AndroidNDK/`)
--   Make `ANDROID_NDK_HOME` to point to the NDK directory. It should be
-    something like:
+- Download the `.zip` file from
+  https://developer.android.com/ndk/downloads#stable-downloads.
+- Unzip the `.zip` file to your preferred location (say
+  `/path/to/AndroidNDK/`)
+- Make `ANDROID_NDK_HOME` to point to the NDK directory. It should be
+  something like:
 
 ```
 export ANDROID_NDK_HOME=/path/to/AndroidNDK/
 ```
 
-*Tips: make sure your `ANDROID_NDK_HOME` points to the directory that has
-`README.md` in it.*
+_Tips: make sure your `ANDROID_NDK_HOME` points to the directory that has
+`README.md` in it._
 
 With the above set up, let's try to build the `litert_lm_main` binary:
 
@@ -382,19 +388,19 @@ To be able to build the binary for Android, one needs to install NDK r28b or
 newer from https://developer.android.com/ndk/downloads#stable-downloads.
 Specific steps are:
 
--   Download the `.dmg` file from
-    https://developer.android.com/ndk/downloads#stable-downloads.
--   Open the `.dmg` file and move the `AndroidNDK*` file to your preferred
-    location (say `/path/to/AndroidNDK/`)
--   Make `ANDROID_NDK_HOME` to point to the NDK directory. It should be
-    something like:
+- Download the `.dmg` file from
+  https://developer.android.com/ndk/downloads#stable-downloads.
+- Open the `.dmg` file and move the `AndroidNDK*` file to your preferred
+  location (say `/path/to/AndroidNDK/`)
+- Make `ANDROID_NDK_HOME` to point to the NDK directory. It should be
+  something like:
 
 ```
 export ANDROID_NDK_HOME=/path/to/AndroidNDK/AndroidNDK*.app/Contents/NDK/
 ```
 
-*Tips: make sure your `ANDROID_NDK_HOME` points to the directory that has
-`README.md` in it.*
+_Tips: make sure your `ANDROID_NDK_HOME` points to the directory that has
+`README.md` in it._
 
 With the above set up, let's try to build the `litert_lm_main` binary:
 
@@ -454,12 +460,12 @@ adb shell LD_LIBRARY_PATH=$DEVICE_FOLDER \
 language models (LLMs) using our LiteRT [Engine/Session interface](#engine). It
 provides basic functionalities as the following:
 
--   generating text based on a user-provided prompt.
--   executing the inference on various hardware backends, e.g. CPU / GPU.
--   includes options for performance analysis, allowing users to benchmark
-    prefill and decoding speeds, as well as monitor peak memory consumption
-    during the run.
--   supports both synchronous and asynchronous execution modes.
+- generating text based on a user-provided prompt.
+- executing the inference on various hardware backends, e.g. CPU / GPU.
+- includes options for performance analysis, allowing users to benchmark
+  prefill and decoding speeds, as well as monitor peak memory consumption
+  during the run.
+- supports both synchronous and asynchronous execution modes.
 
 <details>
 <summary><strong>Example commands</strong></summary>
@@ -486,9 +492,9 @@ Below are a few example commands (please update accordingly when using `adb`):
     --async=false
 ```
 
-*Tip: when benchmarking on Android devices, remember to use `taskset` to pin the
+_Tip: when benchmarking on Android devices, remember to use `taskset` to pin the
 executable to the main core for getting the consistent numbers, e.g. `taskset
-f0`.*
+f0`._
 
 **Run the model with your prompt**
 
@@ -501,16 +507,16 @@ f0`.*
 
 More detailed description about each of the flags are in the following table:
 
-| Flag Name | Description | Default Value |
-| :--- | :--- | :--- |
-| `backend` | Executor backend to use for LLM execution (e.g., cpu, gpu). | `"gpu"` |
-| `model_path` | Path to the `.litertlm` file for LLM execution. | `""` |
-| `input_prompt` | Input prompt to use for testing LLM execution. | `"What is the tallest building in the world?"` |
-| `benchmark` | Benchmark the LLM execution. | `false` |
-| `benchmark_prefill_tokens` | If benchmark is true and this value is > 0, the benchmark will use this number to set the prefill tokens, regardless of the input prompt. If this is non-zero, `async` must be `false`. | `0` |
-| `benchmark_decode_tokens` | If benchmark is true and this value is > 0, the benchmark will use this number to set the number of decode steps, regardless of the input prompt. | `0` |
-| `async` | Run the LLM execution asynchronously. | `true` |
-| `report_peak_memory_footprint` | Report peak memory footprint. | `false` |
+| Flag Name                      | Description                                                                                                                                                                             | Default Value                                  |
+| :----------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------- |
+| `backend`                      | Executor backend to use for LLM execution (e.g., cpu, gpu).                                                                                                                             | `"gpu"`                                        |
+| `model_path`                   | Path to the `.litertlm` file for LLM execution.                                                                                                                                         | `""`                                           |
+| `input_prompt`                 | Input prompt to use for testing LLM execution.                                                                                                                                          | `"What is the tallest building in the world?"` |
+| `benchmark`                    | Benchmark the LLM execution.                                                                                                                                                            | `false`                                        |
+| `benchmark_prefill_tokens`     | If benchmark is true and this value is > 0, the benchmark will use this number to set the prefill tokens, regardless of the input prompt. If this is non-zero, `async` must be `false`. | `0`                                            |
+| `benchmark_decode_tokens`      | If benchmark is true and this value is > 0, the benchmark will use this number to set the number of decode steps, regardless of the input prompt.                                       | `0`                                            |
+| `async`                        | Run the LLM execution asynchronously.                                                                                                                                                   | `true`                                         |
+| `report_peak_memory_footprint` | Report peak memory footprint.                                                                                                                                                           | `false`                                        |
 
 </details>
 
@@ -519,23 +525,23 @@ More detailed description about each of the flags are in the following table:
 The LiteRT-LM provides a C++ API for executing Language Models. It is designed
 around two primary classes: `Engine` and `Session`.
 
--   The **`Engine`** is the main entry point. It's responsible for loading the
-    model and its associated resources (like the tokenizer) from storage and
-    preparing them for execution. It acts as a factory for creating
-    `Conversation` or `Session` objects.
--   The **`Conversation`**: This class represents a single, stateful
-    conversation with the LLM and is the recommended entry point for most users.
-    It internally manages a `Session` and handles complex data processing tasks.
-    These tasks include maintaining the initial context, managing tool
-    definitions, preprocessing multimodal data, and applying Jinja prompt
-    templates with role-based message formatting. Each `Conversation` instance
-    is independent, allowing for multiple concurrent interactions.
--   The **`Session`**: This class also represents a single, stateful interaction
-    with the LLM, holding the context and providing methods for text generation.
-    `Session` is intended for advanced users who need fine-grained control over
-    the prefill and decode phases, such as implementing chunked prefill or
-    custom multimodal preprocessing. Like `Conversation`, each `Session`
-    instance is independent.
+- The **`Engine`** is the main entry point. It's responsible for loading the
+  model and its associated resources (like the tokenizer) from storage and
+  preparing them for execution. It acts as a factory for creating
+  `Conversation` or `Session` objects.
+- The **`Conversation`**: This class represents a single, stateful
+  conversation with the LLM and is the recommended entry point for most users.
+  It internally manages a `Session` and handles complex data processing tasks.
+  These tasks include maintaining the initial context, managing tool
+  definitions, preprocessing multimodal data, and applying Jinja prompt
+  templates with role-based message formatting. Each `Conversation` instance
+  is independent, allowing for multiple concurrent interactions.
+- The **`Session`**: This class also represents a single, stateful interaction
+  with the LLM, holding the context and providing methods for text generation.
+  `Session` is intended for advanced users who need fine-grained control over
+  the prefill and decode phases, such as implementing chunked prefill or
+  custom multimodal preprocessing. Like `Conversation`, each `Session`
+  instance is independent.
 
 ### Basic Workflow for Text-in-Text-out Inference
 
@@ -553,10 +559,10 @@ Below is the simplest way to send message and get model response. It is
 recommended for most use cases. It mirrors [Gemini Chat
 APIs](https://ai.google.dev/gemini-api/docs/text-generation#multi-turn-conversations).
 
--   `SendMessage`: A blocking call that takes user input and returns the
-    complete model response.
--   `SendMessageAsync`: A non-blocking call that streams the model's response
-    back token-by-token through callbacks.
+- `SendMessage`: A blocking call that takes user input and returns the
+  complete model response.
+- `SendMessageAsync`: A non-blocking call that streams the model's response
+  back token-by-token through callbacks.
 
 Example code snippet:
 
@@ -719,10 +725,10 @@ Json, and currently expect following structs:
 transformer inference: prefill and decode. This can be useful for advanced
 scenarios or performance optimization.
 
--   **Prefill**: The `RunPrefill` or `RunPrefillAsync` methods process the input
-    prompt and populate the model's internal state (KV cache).
--   **Decode**: The `RunDecode` or `RunDecodeAsync` methods generate new tokens
-    one at a time based on the prefilled state.
+- **Prefill**: The `RunPrefill` or `RunPrefillAsync` methods process the input
+  prompt and populate the model's internal state (KV cache).
+- **Decode**: The `RunDecode` or `RunDecodeAsync` methods generate new tokens
+  one at a time based on the prefilled state.
 
 Example code snippet:
 
@@ -802,3 +808,9 @@ Before creating a new issue, please search the existing issues to avoid
 duplicates. When filing a new issue, please provide a clear title and a detailed
 description of the problem, including steps to reproduce it. The more
 information you provide, the easier it will be for us to help you.
+
+---
+
+# NOTES
+
+1. Audio input only supports CPU

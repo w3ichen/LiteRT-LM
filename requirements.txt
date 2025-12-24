@@ -1,0 +1,6 @@
+pyaudio
+opencv-python
+gTTS
+numpy
+scipy
+openai-whisper

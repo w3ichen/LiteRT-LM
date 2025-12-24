@@ -1,0 +1,1 @@
+{"role": "user", "content": [{"type": "text", "text": "Describe the image and audio."}, {"type": "image", "path": "/Users/weichen/Documents/GitHub/LiteRT-LM/test_input.jpg"}, {"type": "audio", "path": "/Users/weichen/Documents/GitHub/LiteRT-LM/test_input.wav"}]}

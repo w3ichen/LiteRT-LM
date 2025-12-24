@@ -2,3 +2,8 @@
 /bazel-*
 *.litertlm
 .DS_Store
+
+*.wav
+*.jpg
+*.png
+lit.macos_arm64

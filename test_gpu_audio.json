@@ -1,0 +1,7 @@
+{
+  "role": "user",
+  "content": [
+    {"type": "text", "text": "Transcribe this audio."},
+    {"type": "audio", "path": "/Users/weichen/Documents/GitHub/LiteRT-LM/audio_inputs/audio_1.wav"}
+  ]
+}
