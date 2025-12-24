@@ -1,2 +1,4 @@
 /MODULE.bazel.lock
 /bazel-*
+*.litertlm
+.DS_Store
